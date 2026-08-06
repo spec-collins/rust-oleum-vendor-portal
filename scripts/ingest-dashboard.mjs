@@ -1,9 +1,9 @@
 import path from 'node:path';
-import { loadLocalEnv, ROOT } from '../lib/env.js';
+import { loadLocalEnvChain } from '../lib/env.js';
 import { closePool } from '../lib/db.js';
 import { ingestDashboardWorkbook } from '../lib/ingest-dashboard.js';
 
-loadLocalEnv();
+loadLocalEnvChain();
 
 const input =
   process.argv[2] ||

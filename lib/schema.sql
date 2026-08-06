@@ -47,9 +47,12 @@ CREATE TABLE IF NOT EXISTS vendor_download_files (
   vendor_id   TEXT PRIMARY KEY,
   pathname    TEXT NOT NULL,
   filename    TEXT NOT NULL,
+  blob_url    TEXT,
   byte_size   BIGINT,
   uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE vendor_download_files ADD COLUMN IF NOT EXISTS blob_url TEXT;
 
 CREATE TABLE IF NOT EXISTS vendor_uploads (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

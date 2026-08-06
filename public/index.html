@@ -464,7 +464,7 @@
             <h3>Download Excel</h3>
             <p>Your pre-prepared workbook. Available once SpecInsite uploads it for your vendor ID.</p>
             <button class="primary-btn" type="button" id="downloadBtn" disabled>Download unavailable</button>
-            <p class="hint" id="downloadHint">Phase 3 — storage + signed download.</p>
+            <p class="hint" id="downloadHint">Your pre-built Excel appears here once SpecInsite uploads it.</p>
           </div>
           <div class="action-card">
             <h3>Upload PDF / DOCX</h3>
@@ -652,11 +652,19 @@
       document.getElementById('maxSizeLabel').textContent =
         Math.round(data.upload.max_bytes_per_file / (1024 * 1024)) + ' MB';
 
+      const downloadBtn = document.getElementById('downloadBtn');
       if (data.download_ready) {
-        const btn = document.getElementById('downloadBtn');
-        btn.disabled = false;
-        btn.textContent = 'Download Excel';
-        document.getElementById('downloadHint').textContent = 'Ready for your vendor ID.';
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = 'Download Excel';
+        document.getElementById('downloadHint').textContent = 'Downloads only your vendor’s file.';
+        downloadBtn.onclick = () => {
+          const qs = new URLSearchParams({ vid: vendorId, t: token });
+          window.location.href = '/api/download?' + qs.toString();
+        };
+      } else {
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = 'Download unavailable';
+        downloadBtn.onclick = null;
       }
 
       if (data.response && data.response.choice) {

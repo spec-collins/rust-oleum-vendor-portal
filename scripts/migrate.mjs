@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadLocalEnv, ROOT } from '../lib/env.js';
+import { loadLocalEnvChain, ROOT } from '../lib/env.js';
 import { getPool, closePool } from '../lib/db.js';
 
-loadLocalEnv();
+loadLocalEnvChain();
 
 const schemaPath = path.join(ROOT, 'lib', 'schema.sql');
 const sql = fs.readFileSync(schemaPath, 'utf8');
