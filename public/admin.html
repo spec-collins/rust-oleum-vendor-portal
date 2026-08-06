@@ -275,14 +275,14 @@ document.getElementById('uploadExcelBtn').addEventListener('click', async () => 
     const pathname = `downloads/${vendorId}/template.xlsx`;
     const blob = await upload(pathname, file, {
       access: 'private',
-      handleUploadUrl: '/api/admin-excel-upload',
+      handleUploadUrl: '/api/admin-excel',
       multipart: file.size > 4 * 1024 * 1024,
       clientPayload: JSON.stringify({ vendor_id: vendorId, filename: file.name }),
       headers: { 'x-admin-token': t },
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
 
-    const complete = await fetch('/api/admin-excel-complete?token=' + encodeURIComponent(t), {
+    const complete = await fetch('/api/admin-excel?token=' + encodeURIComponent(t), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -373,7 +373,7 @@ async function loadVendorFiles() {
       const link = document.createElement('a');
       link.textContent = 'Download';
       link.href =
-        '/api/admin-upload-file?token=' +
+        '/api/admin-uploads?token=' +
         encodeURIComponent(t) +
         '&id=' +
         encodeURIComponent(f.id);
@@ -422,7 +422,7 @@ document.getElementById('zipVendorFiles').addEventListener('click', async () => 
       i += 1;
       setStatus('uploadsStatus', '', `Fetching ${i}/${currentUploadFiles.length}: ${f.original_name}`);
       const res = await fetch(
-        '/api/admin-upload-file?token=' + encodeURIComponent(t) + '&id=' + encodeURIComponent(f.id)
+        '/api/admin-uploads?token=' + encodeURIComponent(t) + '&id=' + encodeURIComponent(f.id)
       );
       if (!res.ok) throw new Error(`Failed to fetch ${f.original_name}`);
       const buf = await res.arrayBuffer();

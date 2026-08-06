@@ -835,7 +835,7 @@
   async function refreshUploadCount() {
     try {
       const qs = new URLSearchParams({ vid: vendorId, t: token });
-      const res = await fetch('/api/uploads?' + qs.toString(), { cache: 'no-store' });
+      const res = await fetch('/api/upload?' + qs.toString(), { cache: 'no-store' });
       const data = await res.json();
       if (res.ok && data.ok) updateUploadCount(data.count, data.max_files);
     } catch (_) { /* ignore */ }
@@ -907,7 +907,7 @@
           },
         });
 
-        const complete = await fetch('/api/upload-complete', {
+        const complete = await fetch('/api/upload', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

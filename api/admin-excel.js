@@ -15,8 +15,7 @@ const XLSX_TYPES = [
 ];
 
 /**
- * Client-upload token + completion webhook for per-vendor Excel templates.
- * Admin auth required on token generation.
+ * Admin Excel template upload (token + complete) in one function.
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -29,15 +28,22 @@ export default async function handler(req, res) {
     return sendJson(res, body.status || 400, { ok: false, error: body.error });
   }
 
-  // Token generation is admin-gated. Completion callbacks come from Vercel Blob (no admin header).
-  if (body.value?.type !== 'blob.upload-completed') {
+  const type = body.value?.type;
+  if (type === 'blob.generate-client-token' || type === 'blob.upload-completed') {
+    return handleTokenFlow(req, res, body.value);
+  }
+  return handleComplete(req, res, body.value);
+}
+
+async function handleTokenFlow(req, res, body) {
+  if (body?.type !== 'blob.upload-completed') {
     const auth = assertAdmin(req);
     if (!auth.ok) return sendJson(res, auth.status, { ok: false, error: auth.error });
   }
 
   try {
     const jsonResponse = await handleUpload({
-      body: body.value,
+      body,
       request: req,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         let payload = {};
@@ -93,7 +99,48 @@ export default async function handler(req, res) {
 
     return sendJson(res, 200, jsonResponse);
   } catch (err) {
-    console.error('admin-excel-upload failed:', err);
+    console.error('admin-excel upload failed:', err);
     return sendJson(res, 400, { ok: false, error: err.message || 'Upload failed.' });
+  }
+}
+
+async function handleComplete(req, res, value) {
+  const auth = assertAdmin(req);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, error: auth.error });
+
+  const vendorId = String(value.vendor_id || '').trim();
+  const pathname = String(value.pathname || '').trim();
+  const blobUrl = String(value.url || value.blob_url || '').trim();
+  const filename = value.filename ? String(value.filename) : null;
+  const byteSize =
+    value.size != null || value.byte_size != null
+      ? Number(value.size ?? value.byte_size)
+      : null;
+
+  if (!isValidVendorId(vendorId)) {
+    return sendJson(res, 400, { ok: false, error: 'Invalid vendor_id.' });
+  }
+  if (pathname !== downloadPathname(vendorId)) {
+    return sendJson(res, 400, { ok: false, error: 'pathname does not match vendor_id.' });
+  }
+  if (vendorIdFromDownloadPath(pathname) !== vendorId) {
+    return sendJson(res, 400, { ok: false, error: 'pathname vendor mismatch.' });
+  }
+  if (!blobUrl) {
+    return sendJson(res, 400, { ok: false, error: 'blob url is required.' });
+  }
+
+  try {
+    const row = await registerVendorDownload({
+      vendorId,
+      blobUrl,
+      pathname,
+      filename,
+      byteSize: Number.isFinite(byteSize) ? byteSize : null,
+    });
+    return sendJson(res, 200, { ok: true, download: row });
+  } catch (err) {
+    console.error('admin-excel complete failed:', err);
+    return sendJson(res, 500, { ok: false, error: 'Could not register download.' });
   }
 }

@@ -3,10 +3,14 @@ import { sendJson, getQuery } from '../lib/http.js';
 import { query, UNDEFINED_TABLE } from '../lib/db.js';
 import { isValidVendorId } from '../lib/download-paths.js';
 import { listVendorUploads, countVendorUploads } from '../lib/register-upload.js';
+import { parseUploadPathname } from '../lib/upload-paths.js';
+import { presignPrivateGet } from '../lib/presign-get.js';
 
 /**
- * Admin: list vendors with upload counts, or files for one vendor.
- * Response shape is SMS-friendly (stable pathname + metadata).
+ * Admin uploads:
+ * - GET                       → vendors + upload counts
+ * - GET ?vendor_id=           → files for one vendor (SMS-friendly metadata)
+ * - GET ?id= or ?pathname=    → redirect to short-lived private file download
  */
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -18,6 +22,10 @@ export default async function handler(req, res) {
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, error: auth.error });
 
   const q = getQuery(req);
+  const id = q.get('id');
+  const pathnameQ = q.get('pathname');
+  if (id || pathnameQ) return downloadOne(res, id, pathnameQ);
+
   const vendorId = String(q.get('vendor_id') || '').trim();
 
   try {
@@ -70,6 +78,48 @@ export default async function handler(req, res) {
     }
     console.error('admin-uploads failed:', err);
     return sendJson(res, 500, { ok: false, error: 'Could not list uploads.' });
+  }
+}
+
+async function downloadOne(res, id, pathnameQ) {
+  try {
+    let row;
+    if (id) {
+      const result = await query(
+        `SELECT id, vendor_id, pathname, original_name
+           FROM vendor_uploads WHERE id = $1`,
+        [Number(id)]
+      );
+      row = result.rows[0];
+    } else {
+      const result = await query(
+        `SELECT id, vendor_id, pathname, original_name
+           FROM vendor_uploads WHERE pathname = $1`,
+        [String(pathnameQ)]
+      );
+      row = result.rows[0];
+    }
+
+    if (!row) {
+      return sendJson(res, 404, { ok: false, error: 'Upload not found.' });
+    }
+
+    const parsed = parseUploadPathname(row.pathname);
+    if (!parsed || parsed.vendor_id !== row.vendor_id) {
+      return sendJson(res, 500, { ok: false, error: 'Stored pathname is invalid.' });
+    }
+
+    const location = await presignPrivateGet(row.pathname);
+    res.statusCode = 302;
+    res.setHeader('Location', location);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.end();
+  } catch (err) {
+    if (err && err.code === UNDEFINED_TABLE) {
+      return sendJson(res, 503, { ok: false, error: 'Tables missing. Run npm run migrate.' });
+    }
+    console.error('admin-uploads download failed:', err);
+    return sendJson(res, 500, { ok: false, error: 'Could not prepare download.' });
   }
 }
 
