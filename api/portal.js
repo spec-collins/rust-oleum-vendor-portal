@@ -12,19 +12,27 @@ function clean(value, max) {
   return value.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
-function emptyMetrics() {
-  return [1, 2, 3, 4, 5].map((n) => ({
-    key: `metric_${n}`,
-    label: `Metric ${n}`,
-    value: null,
-  }));
+function emptyDashboard() {
+  return {
+    total_specs_estimated: null,
+    specs_by_type_summary: '',
+    specs_by_type: {},
+    sap_numbers: null,
+    specs_in_specright: null,
+    pct_in_specright: null,
+    specs_with_weight: null,
+    pct_with_weight: null,
+    specs_with_material: null,
+    pct_with_material: null,
+    specs_with_pcr: null,
+    pct_with_pcr: null,
+    specs_epr_ready: null,
+    pct_epr_ready: null,
+    division: 'Cleaners',
+    spec_definition: 'Drawing / die line',
+  };
 }
 
-/**
- * Signed-link bootstrap for the vendor portal.
- * Phase 1: identity + empty metrics + feature flags.
- * Phase 2+: fills metrics / download / upload counts from DB.
- */
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
@@ -33,7 +41,7 @@ export default async function handler(req, res) {
 
   const q = getQuery(req);
   const vendorId = clean(q.get('vid'), 128);
-  const vendorName = clean(q.get('name'), 200) || null;
+  const vendorNameFromLink = clean(q.get('name'), 200) || null;
   const token = clean(q.get('t'), 128);
 
   if (!vendorId) {
@@ -45,24 +53,29 @@ export default async function handler(req, res) {
     return sendJson(res, 403, { ok: false, error: 'Invalid or missing link token.' });
   }
 
-  let metrics = emptyMetrics();
+  let vendorName = vendorNameFromLink;
+  let dashboard = emptyDashboard();
+  let hasMetrics = false;
   let downloadReady = false;
   let uploadCount = 0;
   let response = null;
+
+  const uploadMeta = {
+    count: 0,
+    max_files: MAX_UPLOAD_FILES_PER_VENDOR,
+    max_bytes_per_file: MAX_UPLOAD_BYTES_PER_FILE,
+    allowed_extensions: ALLOWED_UPLOAD_EXTENSIONS,
+  };
 
   if (!resolveConnectionString()) {
     return sendJson(res, 200, {
       ok: true,
       vendor_id: vendorId,
       vendor_name: vendorName,
-      metrics,
+      has_metrics: false,
+      dashboard,
       download_ready: false,
-      upload: {
-        count: 0,
-        max_files: MAX_UPLOAD_FILES_PER_VENDOR,
-        max_bytes_per_file: MAX_UPLOAD_BYTES_PER_FILE,
-        allowed_extensions: ALLOWED_UPLOAD_EXTENSIONS,
-      },
+      upload: uploadMeta,
       response: null,
       phases: { metrics: true, download: false, upload: false },
       db: false,
@@ -71,22 +84,14 @@ export default async function handler(req, res) {
 
   try {
     const metricsResult = await query(
-      `SELECT vendor_name,
-              metric_1_label, metric_1_value,
-              metric_2_label, metric_2_value,
-              metric_3_label, metric_3_value,
-              metric_4_label, metric_4_value,
-              metric_5_label, metric_5_value
-         FROM vendor_metrics WHERE vendor_id = $1`,
+      `SELECT vendor_name, dashboard FROM vendor_metrics WHERE vendor_id = $1`,
       [vendorId]
     );
     if (metricsResult.rows[0]) {
-      const row = metricsResult.rows[0];
-      metrics = [1, 2, 3, 4, 5].map((n) => ({
-        key: `metric_${n}`,
-        label: row[`metric_${n}_label`] || `Metric ${n}`,
-        value: row[`metric_${n}_value`],
-      }));
+      hasMetrics = true;
+      vendorName = metricsResult.rows[0].vendor_name || vendorName;
+      const raw = metricsResult.rows[0].dashboard;
+      dashboard = { ...emptyDashboard(), ...(typeof raw === 'string' ? JSON.parse(raw) : raw) };
     }
 
     const dl = await query(
@@ -112,21 +117,16 @@ export default async function handler(req, res) {
       console.error('portal lookup failed:', err);
       return sendJson(res, 503, { ok: false, error: 'Database is unreachable.' });
     }
-    // Tables missing: still allow shell preview when signing passes.
   }
 
   return sendJson(res, 200, {
     ok: true,
     vendor_id: vendorId,
     vendor_name: vendorName,
-    metrics,
+    has_metrics: hasMetrics,
+    dashboard,
     download_ready: downloadReady,
-    upload: {
-      count: uploadCount,
-      max_files: MAX_UPLOAD_FILES_PER_VENDOR,
-      max_bytes_per_file: MAX_UPLOAD_BYTES_PER_FILE,
-      allowed_extensions: ALLOWED_UPLOAD_EXTENSIONS,
-    },
+    upload: { ...uploadMeta, count: uploadCount },
     response,
     phases: {
       metrics: true,

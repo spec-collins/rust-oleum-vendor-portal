@@ -1,6 +1,4 @@
 -- Rust-Oleum vendor portal schema. Safe to run repeatedly.
--- Phase 1 uses vendor_responses + response_events.
--- Later phases add vendor_metrics, download files, and upload registry.
 
 CREATE TABLE IF NOT EXISTS vendor_responses (
   vendor_id               TEXT PRIMARY KEY,
@@ -31,24 +29,20 @@ CREATE INDEX IF NOT EXISTS response_events_vendor_idx
 CREATE INDEX IF NOT EXISTS response_events_ip_recent_idx
   ON response_events (ip_hash, received_at DESC);
 
--- Phase 2: metrics snapshot ingested from Excel (one row per vendor).
+-- Dashboard snapshot from the Cleaners one-pager Excel (one row per vendor).
 CREATE TABLE IF NOT EXISTS vendor_metrics (
   vendor_id     TEXT PRIMARY KEY,
   vendor_name   TEXT,
-  metric_1_label TEXT,
-  metric_1_value TEXT,
-  metric_2_label TEXT,
-  metric_2_value TEXT,
-  metric_3_label TEXT,
-  metric_3_value TEXT,
-  metric_4_label TEXT,
-  metric_4_value TEXT,
-  metric_5_label TEXT,
-  metric_5_value TEXT,
+  rank          INT,
+  dashboard     JSONB NOT NULL DEFAULT '{}'::jsonb,
   ingested_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Phase 3: pre-built per-vendor Excel download pointer.
+ALTER TABLE vendor_metrics ADD COLUMN IF NOT EXISTS rank INT;
+ALTER TABLE vendor_metrics ADD COLUMN IF NOT EXISTS dashboard JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE vendor_metrics ADD COLUMN IF NOT EXISTS vendor_name TEXT;
+ALTER TABLE vendor_metrics ADD COLUMN IF NOT EXISTS ingested_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
 CREATE TABLE IF NOT EXISTS vendor_download_files (
   vendor_id   TEXT PRIMARY KEY,
   pathname    TEXT NOT NULL,
@@ -57,7 +51,6 @@ CREATE TABLE IF NOT EXISTS vendor_download_files (
   uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Phase 4: registry of vendor-uploaded PDF/DOCX (blobs live in object storage).
 CREATE TABLE IF NOT EXISTS vendor_uploads (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   vendor_id     TEXT NOT NULL,

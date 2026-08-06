@@ -110,6 +110,14 @@
     color: var(--ink-soft);
   }
 
+  .scope-note {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--mute);
+    max-width: 360px;
+  }
   .metrics {
     display: grid;
     gap: 10px;
@@ -122,6 +130,10 @@
     transition: border-color 0.2s ease, transform 0.2s ease;
   }
   .metric:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+  .metric.hero {
+    background: linear-gradient(160deg, rgba(26,108,255,0.08), rgba(255,255,255,0.65));
+    border-color: rgba(26, 108, 255, 0.18);
+  }
   .metric .label {
     font-size: 12px;
     letter-spacing: 0.02em;
@@ -136,11 +148,84 @@
     line-height: 1.1;
     color: var(--ink);
   }
+  .metric.hero .value { font-size: 36px; }
   .metric .value.empty {
     font-size: 15px;
     font-weight: 500;
     color: var(--mute);
     letter-spacing: 0;
+  }
+  .metric .sub {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--mute);
+  }
+  .metric .est-tag {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    vertical-align: middle;
+  }
+  .dial-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .dial-pct {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .bar-track {
+    margin-top: 8px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(11,13,16,0.08);
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--ink);
+    width: 0;
+    transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .bar-fill.accent { background: var(--accent); }
+  .bar-fill.ok { background: var(--ok); }
+  .type-list { display: grid; gap: 7px; margin-top: 8px; }
+  .type-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+  }
+  .type-row .name { color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .type-row .count {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .type-bar {
+    grid-column: 1 / -1;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(11,13,16,0.08);
+    overflow: hidden;
+  }
+  .type-bar > span {
+    display: block;
+    height: 100%;
+    background: rgba(26, 108, 255, 0.75);
+    border-radius: 999px;
+    width: 0;
+    transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .option-btn {
@@ -305,7 +390,7 @@
       <div class="brand">SpecInsite <span>· Vendor Portal</span></div>
       <div class="vendor-line" id="vendorLine" hidden>
         <strong id="vendorName"></strong>
-        <span id="vendorIdLabel"></span>
+        <span class="scope-note" id="scopeNote">Cleaners Division — Estimated Specs (where Spec is defined as the Drawing or Die Line)</span>
       </div>
     </header>
 
@@ -316,8 +401,8 @@
 
     <div id="portal" class="grid hidden">
       <section class="panel" aria-labelledby="metrics-heading">
-        <h2 id="metrics-heading">Your metrics</h2>
-        <p class="lede">Snapshot for your account. Values load after metrics ingest.</p>
+        <h2 id="metrics-heading">Your dashboard</h2>
+        <p class="lede">Estimated Cleaners specs for your account. Spec counts drive VOR scope and cost.</p>
         <div class="metrics" id="metrics"></div>
       </section>
 
@@ -414,25 +499,125 @@
     if (!message) statusEl.className = '';
   }
 
-  function renderMetrics(metrics) {
+  function fmtNum(n) {
+    if (n === null || n === undefined || n === '') return null;
+    return Number(n).toLocaleString('en-US');
+  }
+
+  function dialTile({ label, pct, count, fillClass }) {
+    const tile = document.createElement('div');
+    tile.className = 'metric';
+    const pctText = pct === null || pct === undefined ? '—' : `${pct}%`;
+    const countText = count === null || count === undefined ? '' : `${fmtNum(count)} specs`;
+    tile.innerHTML =
+      '<div class="label"></div>' +
+      '<div class="dial-row"><div class="dial-pct"></div><div class="sub"></div></div>' +
+      '<div class="bar-track"><div class="bar-fill"></div></div>';
+    tile.querySelector('.label').textContent = label;
+    tile.querySelector('.dial-pct').textContent = pctText;
+    tile.querySelector('.sub').textContent = countText;
+    const fill = tile.querySelector('.bar-fill');
+    if (fillClass) fill.classList.add(fillClass);
+    requestAnimationFrame(() => {
+      fill.style.width = Math.max(0, Math.min(100, Number(pct) || 0)) + '%';
+    });
+    return tile;
+  }
+
+  function renderDashboard(dashboard, hasMetrics) {
     const root = document.getElementById('metrics');
     root.innerHTML = '';
-    (metrics || []).forEach((m) => {
-      const tile = document.createElement('div');
-      tile.className = 'metric';
-      const hasValue = m.value !== null && m.value !== undefined && String(m.value).trim() !== '';
-      tile.innerHTML =
-        '<div class="label"></div><div class="value"></div>';
-      tile.querySelector('.label').textContent = m.label || m.key;
-      const valueEl = tile.querySelector('.value');
-      if (hasValue) {
-        valueEl.textContent = String(m.value);
-      } else {
-        valueEl.textContent = 'Pending ingest';
-        valueEl.classList.add('empty');
-      }
-      root.appendChild(tile);
-    });
+    const d = dashboard || {};
+
+    if (!hasMetrics) {
+      const pending = document.createElement('div');
+      pending.className = 'metric';
+      pending.innerHTML = '<div class="label">Dashboard</div><div class="value empty">Pending ingest</div>';
+      root.appendChild(pending);
+      return;
+    }
+
+    const hero = document.createElement('div');
+    hero.className = 'metric hero';
+    hero.innerHTML =
+      '<div class="label">Estimated specs <span class="est-tag">Estimated</span></div>' +
+      '<div class="value"></div>' +
+      '<div class="sub">One drawing / die line = one spec</div>';
+    hero.querySelector('.value').textContent = fmtNum(d.total_specs_estimated) ?? '—';
+    root.appendChild(hero);
+
+    const types = document.createElement('div');
+    types.className = 'metric';
+    const byType = d.specs_by_type || {};
+    const entries = Object.entries(byType).sort((a, b) => b[1] - a[1]);
+    const maxType = entries.reduce((m, [, n]) => Math.max(m, n), 0) || 1;
+    types.innerHTML =
+      '<div class="label">Specs by packaging type</div>' +
+      (d.specs_by_type_summary
+        ? `<div class="sub" style="margin-bottom:6px;">${escapeHtml(d.specs_by_type_summary)}</div>`
+        : '') +
+      '<div class="type-list"></div>';
+    const list = types.querySelector('.type-list');
+    if (!entries.length) {
+      list.innerHTML = '<div class="sub">No packaging-type breakdown</div>';
+    } else {
+      entries.forEach(([name, count]) => {
+        const row = document.createElement('div');
+        row.className = 'type-row';
+        row.innerHTML =
+          '<div class="name"></div><div class="count"></div><div class="type-bar"><span></span></div>';
+        row.querySelector('.name').textContent = name;
+        row.querySelector('.count').textContent = fmtNum(count);
+        const bar = row.querySelector('.type-bar > span');
+        requestAnimationFrame(() => {
+          bar.style.width = Math.round((count / maxType) * 100) + '%';
+        });
+        list.appendChild(row);
+      });
+    }
+    root.appendChild(types);
+
+    const sap = document.createElement('div');
+    sap.className = 'metric';
+    sap.innerHTML =
+      '<div class="label">SAP numbers you supply</div>' +
+      '<div class="value"></div>' +
+      '<div class="sub">Firm count from SAP · for your reference</div>';
+    sap.querySelector('.value').textContent = fmtNum(d.sap_numbers) ?? '—';
+    root.appendChild(sap);
+
+    root.appendChild(
+      dialTile({
+        label: 'Specs with a weight recorded',
+        pct: d.pct_with_weight,
+        count: d.specs_with_weight,
+        fillClass: 'accent',
+      })
+    );
+    root.appendChild(
+      dialTile({
+        label: 'Specs with a material recorded',
+        pct: d.pct_with_material,
+        count: d.specs_with_material,
+        fillClass: 'accent',
+      })
+    );
+    root.appendChild(
+      dialTile({
+        label: 'EPR ready (weight + material + PCR)',
+        pct: d.pct_epr_ready,
+        count: d.specs_epr_ready,
+        fillClass: 'ok',
+      })
+    );
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   async function bootstrap() {
@@ -443,10 +628,9 @@
 
     document.getElementById('vendorLine').hidden = false;
     document.getElementById('vendorName').textContent = vendorName || vendorId;
-    document.getElementById('vendorIdLabel').textContent = vendorName ? vendorId : '';
 
     portal.classList.remove('hidden');
-    renderMetrics([1,2,3,4,5].map((n) => ({ key: 'metric_' + n, label: 'Metric ' + n, value: null })));
+    renderDashboard(null, false);
 
     try {
       const qs = new URLSearchParams({ vid: vendorId, t: token });
@@ -463,7 +647,7 @@
       if (data.vendor_name) {
         document.getElementById('vendorName').textContent = data.vendor_name;
       }
-      renderMetrics(data.metrics);
+      renderDashboard(data.dashboard, data.has_metrics);
       document.getElementById('maxFilesLabel').textContent = String(data.upload.max_files);
       document.getElementById('maxSizeLabel').textContent =
         Math.round(data.upload.max_bytes_per_file / (1024 * 1024)) + ' MB';
