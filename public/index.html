@@ -113,8 +113,17 @@
   .scope-note {
     display: block;
     margin-top: 4px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--ink-soft);
+    max-width: 360px;
+  }
+  .scope-def {
+    display: block;
+    margin-top: 2px;
     font-size: 12px;
     line-height: 1.4;
+    font-style: italic;
     color: var(--mute);
     max-width: 360px;
   }
@@ -425,7 +434,8 @@
       <div class="brand">SpecInsite <span>· Vendor Portal</span></div>
       <div class="vendor-line" id="vendorLine" hidden>
         <strong id="vendorName"></strong>
-        <span class="scope-note" id="scopeNote">Cleaners Division — Estimated Specs (where Spec is defined as the Drawing or Die Line)</span>
+        <span class="scope-note" id="scopeNote">Cleaners Division — Estimated Specs</span>
+        <span class="scope-def">Spec is defined as the Drawing or the Die Line.</span>
       </div>
     </header>
 
