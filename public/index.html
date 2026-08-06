@@ -20,6 +20,10 @@
     --accent: #1a6cff;
     --ok: #0f7a4a;
     --danger: #b42318;
+    --btn-download: #3a5f8a;
+    --btn-download-hover: #2f4f73;
+    --btn-upload: #3a6b58;
+    --btn-upload-hover: #2f5748;
     --radius: 14px;
     --font-display: "Space Grotesk", sans-serif;
     --font-body: "DM Sans", sans-serif;
@@ -323,6 +327,20 @@
     color: var(--ink);
     border: 1px solid var(--line-strong);
   }
+  .primary-btn.btn-download {
+    background: var(--btn-download);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.14) inset, 0 8px 18px rgba(58, 95, 138, 0.22);
+  }
+  .primary-btn.btn-download:hover:not(:disabled) {
+    background: var(--btn-download-hover);
+  }
+  .primary-btn.btn-upload {
+    background: var(--btn-upload);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.14) inset, 0 8px 18px rgba(58, 107, 88, 0.22);
+  }
+  .primary-btn.btn-upload:hover:not(:disabled) {
+    background: var(--btn-upload-hover);
+  }
 
   .action-stack { display: grid; gap: 12px; }
   .action-card {
@@ -520,7 +538,7 @@
           <div class="action-card">
             <h3>Download Excel</h3>
             <p>Your pre-prepared workbook. Available once SpecInsite uploads it for your vendor ID.</p>
-            <button class="primary-btn" type="button" id="downloadBtn" disabled>Download unavailable</button>
+            <button class="primary-btn btn-download" type="button" id="downloadBtn" disabled>Download unavailable</button>
             <p class="hint" id="downloadHint">Your pre-built Excel appears here once SpecInsite uploads it.</p>
           </div>
           <div class="action-card">
@@ -530,7 +548,7 @@
             <div class="upload-zone">
               <div style="font-size:13px;color:var(--ink-soft);">Select many files at once. Uploads go directly to secure storage.</div>
               <input id="uploadInput" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
-              <button class="primary-btn" type="button" id="uploadBtn" style="margin-top:12px;">Upload selected</button>
+              <button class="primary-btn btn-upload" type="button" id="uploadBtn" style="margin-top:12px;">Uploaded Files</button>
             </div>
             <div class="upload-progress" id="uploadProgress" hidden></div>
             <p class="hint" id="uploadHint">Files stay under your vendor ID only.</p>
