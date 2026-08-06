@@ -9,9 +9,12 @@ CREATE TABLE IF NOT EXISTS vendor_responses (
   timeframe               TEXT,
   timeframe_label         TEXT,
   timeframe_submitted_at  TIMESTAMPTZ,
+  admin_status            TEXT,
   first_seen_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE vendor_responses ADD COLUMN IF NOT EXISTS admin_status TEXT;
 
 CREATE TABLE IF NOT EXISTS response_events (
   id           BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

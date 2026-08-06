@@ -68,6 +68,7 @@ export default async function handler(req, res) {
              timeframe = NULL,
              timeframe_label = NULL,
              timeframe_submitted_at = NULL,
+             admin_status = NULL,
              last_updated_at = now()
            WHERE vendor_id = $1`,
           [submission.vendor_id]

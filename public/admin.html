@@ -105,6 +105,22 @@
   .muted { color: var(--mute); }
   .pill.complete { color: var(--ok); border-color: rgba(15,122,74,0.35); }
   .pill.partial { color: #9a6700; border-color: rgba(154,103,0,0.35); }
+  .pill.urgent { color: #b42318; border-color: rgba(180,35,24,0.4); background: rgba(180,35,24,0.06); }
+  .pill.overdue { color: #b42318; border-color: rgba(180,35,24,0.35); }
+  .pill.follow { color: #1849a9; border-color: rgba(24,73,169,0.35); }
+  table.responses td .action {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 4px 8px;
+    width: auto;
+    cursor: pointer;
+  }
   .summary {
     display: flex;
     flex-wrap: wrap;
@@ -171,8 +187,9 @@
             <tr>
               <th>Vendor</th>
               <th>Status</th>
+              <th>Follow-up date</th>
               <th>Choice</th>
-              <th>Timeframe / next step</th>
+              <th>Vendor said</th>
               <th>Updated</th>
             </tr>
           </thead>
@@ -252,9 +269,12 @@ function formatWhen(value) {
   }
 }
 
-function statusPill(status) {
-  if (status === 'complete') return { text: 'Complete', cls: 'pill complete' };
-  if (status === 'choice_only') return { text: 'In progress', cls: 'pill partial' };
+function statusPill(r) {
+  if (r.status === 'urgent') return { text: r.status_label || 'Urgent', cls: 'pill urgent' };
+  if (r.status === 'overdue') return { text: r.status_label || 'Overdue', cls: 'pill overdue' };
+  if (r.status === 'follow_up') return { text: r.status_label || 'Follow up', cls: 'pill follow' };
+  if (r.status === 'assistance_provided') return { text: 'Assistance provided', cls: 'pill complete' };
+  if (r.status === 'choice_only') return { text: 'In progress', cls: 'pill partial' };
   return { text: 'No response', cls: 'pill' };
 }
 
@@ -272,27 +292,89 @@ async function loadResponses() {
   const summary = document.getElementById('responsesSummary');
   summary.hidden = false;
   summary.innerHTML =
-    `<span><strong>${data.summary.complete}</strong> complete</span>` +
+    `<span><strong>${data.summary.urgent}</strong> urgent</span>` +
+    `<span><strong>${data.summary.overdue}</strong> overdue</span>` +
+    `<span><strong>${data.summary.follow_up}</strong> follow-up dated</span>` +
+    `<span><strong>${data.summary.assistance_provided}</strong> assistance provided</span>` +
     `<span><strong>${data.summary.choice_only}</strong> in progress</span>` +
-    `<span><strong>${data.summary.no_response}</strong> no response</span>` +
-    `<span><strong>${data.summary.total_vendors}</strong> in metrics list</span>`;
+    `<span><strong>${data.summary.no_response}</strong> no response</span>`;
 
   const body = document.getElementById('responsesBody');
   body.innerHTML = '';
   data.responses.forEach((r) => {
     const tr = document.createElement('tr');
-    const pill = statusPill(r.status);
+    const pill = statusPill(r);
     tr.innerHTML =
       `<td><strong></strong><div class="muted" style="font-size:11px;margin-top:2px;"></div></td>` +
-      `<td><span class="${pill.cls}"></span></td>` +
-      `<td></td><td></td><td class="muted"></td>`;
+      `<td><span class="${pill.cls}"></span><div class="action-slot"></div></td>` +
+      `<td></td><td></td><td></td><td class="muted"></td>`;
     tr.cells[0].querySelector('strong').textContent = r.vendor_name || r.vendor_id;
     tr.cells[0].querySelector('.muted').textContent =
       (r.rank != null ? `#${r.rank} · ` : '') + r.vendor_id;
     tr.cells[1].querySelector('span').textContent = pill.text;
-    tr.cells[2].textContent = r.choice_label || r.choice || '—';
-    tr.cells[3].textContent = r.timeframe_label || r.timeframe || '—';
-    tr.cells[4].textContent = formatWhen(r.last_updated_at || r.choice_submitted_at);
+    tr.cells[2].textContent = r.follow_up_date || '—';
+    tr.cells[3].textContent = r.choice_label || r.choice || '—';
+    tr.cells[4].textContent = r.timeframe_label || r.timeframe || '—';
+    tr.cells[5].textContent = formatWhen(r.last_updated_at || r.choice_submitted_at);
+
+    if (r.status === 'urgent') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'action';
+      btn.textContent = 'Mark assistance provided';
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          const upd = await fetch('/api/admin-responses?token=' + encodeURIComponent(t), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-token': t,
+            },
+            body: JSON.stringify({
+              vendor_id: r.vendor_id,
+              admin_status: 'assistance_provided',
+            }),
+          });
+          const out = await upd.json();
+          if (!upd.ok || !out.ok) throw new Error(out.error || 'Update failed');
+          await loadResponses();
+        } catch (err) {
+          setStatus('responsesStatus', 'err', err.message || String(err));
+          btn.disabled = false;
+        }
+      });
+      tr.cells[1].querySelector('.action-slot').appendChild(btn);
+    } else if (r.status === 'assistance_provided') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'action';
+      btn.textContent = 'Mark urgent again';
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          const upd = await fetch('/api/admin-responses?token=' + encodeURIComponent(t), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-token': t,
+            },
+            body: JSON.stringify({
+              vendor_id: r.vendor_id,
+              admin_status: 'urgent',
+            }),
+          });
+          const out = await upd.json();
+          if (!upd.ok || !out.ok) throw new Error(out.error || 'Update failed');
+          await loadResponses();
+        } catch (err) {
+          setStatus('responsesStatus', 'err', err.message || String(err));
+          btn.disabled = false;
+        }
+      });
+      tr.cells[1].querySelector('.action-slot').appendChild(btn);
+    }
+
     body.appendChild(tr);
   });
 
