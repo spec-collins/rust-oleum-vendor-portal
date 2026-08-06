@@ -443,29 +443,29 @@
 
       <section class="panel" aria-labelledby="response-heading">
         <h2 id="response-heading">How will you provide data?</h2>
-        <p class="lede">Choose one path. Exact wording is a placeholder until we lock Rust-Oleum copy.</p>
+        <p class="lede">Choose one path. You’ll confirm a few details on the next screen.</p>
 
         <div id="stepChoice">
           <button class="option-btn" type="button" data-choice="spreadsheet">
-            <strong>I'll use the spreadsheet <span class="tbd">TBD</span></strong>
+            <strong>I’ll use the spreadsheet</strong>
             Download the workbook, complete it, and return it.
           </button>
           <button class="option-btn" type="button" data-choice="upload_docs">
-            <strong>I'll upload documents <span class="tbd">TBD</span></strong>
-            Send PDF / DOCX packs through this portal.
+            <strong>I’ll upload documents</strong>
+            Download the Excel on the right first — it lists every item we expect documents for. Then use <em>Upload selected</em> under <em>Upload PDF / DOCX</em> on the right to send your PDF or DOCX files.
+          </button>
+          <button class="option-btn" type="button" data-choice="specright">
+            <strong>I’ll enter it into SpecRight</strong>
+            Download the Excel on the right first to see which items are in scope. The template also shows the required fields you should complete in SpecRight before you start entering data.
           </button>
           <button class="option-btn" type="button" data-choice="assisted">
-            <strong>I'd like SpecInsite assistance <span class="tbd">TBD</span></strong>
-            Have SpecInsite help enter or structure the data.
-          </button>
-          <button class="option-btn" type="button" data-choice="discuss">
-            <strong>I need to discuss options <span class="tbd">TBD</span></strong>
-            We'll follow up to align on the right path.
+            <strong>I’d like SpecInsite assistance</strong>
+            Have SpecInsite help enter or structure the data with you.
           </button>
         </div>
 
         <div id="stepTimeframe" class="hidden">
-          <p class="lede">When do you expect to have this ready? An estimate is fine.</p>
+          <p class="lede">Next step (details TBD). For now: when do you expect to have this ready? An estimate is fine.</p>
           <button class="option-btn" type="button" data-timeframe="this_week" data-label="This week">
             <strong>This week</strong>
           </button>
@@ -532,7 +532,8 @@
   const stepTimeframe = document.getElementById('stepTimeframe');
   const stepDone = document.getElementById('stepDone');
 
-  const CHOICES_NEED_TIMEFRAME = new Set(['spreadsheet', 'upload_docs', 'assisted']);
+  // All four choices open a secondary step; content per choice will be refined next.
+  const CHOICES_NEED_TIMEFRAME = new Set(['spreadsheet', 'upload_docs', 'specright', 'assisted']);
 
   function setStatus(kind, message) {
     statusEl.className = kind || '';
