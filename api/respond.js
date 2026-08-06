@@ -53,6 +53,29 @@ export default async function handler(req, res) {
       return sendJson(res, 429, { ok: false, error: 'Too many submissions. Try again shortly.' });
     }
 
+    if (submission.stage === 'reset') {
+      await withTransaction(async (client) => {
+        await client.query(
+          `INSERT INTO response_events (vendor_id, stage, payload, ip_hash, user_agent)
+           VALUES ($1, $2, $3::jsonb, $4, $5)`,
+          [submission.vendor_id, 'reset', JSON.stringify(body.value), ipHash, userAgent]
+        );
+        await client.query(
+          `UPDATE vendor_responses SET
+             choice = NULL,
+             choice_label = NULL,
+             choice_submitted_at = NULL,
+             timeframe = NULL,
+             timeframe_label = NULL,
+             timeframe_submitted_at = NULL,
+             last_updated_at = now()
+           WHERE vendor_id = $1`,
+          [submission.vendor_id]
+        );
+      });
+      return sendJson(res, 200, { ok: true, reset: true });
+    }
+
     await withTransaction(async (client) => {
       await client.query(
         `INSERT INTO response_events (vendor_id, stage, payload, ip_hash, user_agent)

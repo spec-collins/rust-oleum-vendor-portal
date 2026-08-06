@@ -465,27 +465,39 @@
         </div>
 
         <div id="stepTimeframe" class="hidden">
-          <p class="lede">Next step (details TBD). For now: when do you expect to have this ready? An estimate is fine.</p>
-          <button class="option-btn" type="button" data-timeframe="this_week" data-label="This week">
-            <strong>This week</strong>
+          <p class="lede">When do you expect to have this ready? An estimate is fine.</p>
+          <button class="option-btn" type="button" data-timeframe="this_week" data-label="Within the next week">
+            <strong>Within the next week</strong>
           </button>
-          <button class="option-btn" type="button" data-timeframe="next_two_weeks" data-label="Next two weeks">
-            <strong>Next two weeks</strong>
+          <button class="option-btn" type="button" data-timeframe="next_two_weeks" data-label="Within the next two weeks">
+            <strong>Within the next two weeks</strong>
           </button>
-          <button class="option-btn" type="button" data-timeframe="need_more_time" data-label="Need more time">
+          <button class="option-btn" type="button" id="needMoreTimeBtn">
             <strong>I need more time</strong>
+            Pick the date you believe you’ll be done by.
           </button>
-          <div class="date-row">
-            <input type="date" id="customDate" aria-label="Custom date">
-            <button type="button" id="customDateBtn">Use date</button>
+          <div class="date-row hidden" id="moreTimeRow">
+            <input type="date" id="customDate" aria-label="Target completion date">
+            <button type="button" id="customDateBtn">Save date</button>
           </div>
+          <button class="primary-btn ghost" type="button" data-reset style="margin-top:14px;">Reset selection</button>
+        </div>
+
+        <div id="stepAssisted" class="hidden">
+          <p class="lede" style="margin-bottom:14px;">
+            Please <strong>reply to the email</strong> you received from SpecInsite. We’ll gladly set up a
+            <strong>15-minute call</strong> with you to talk further and figure out the best path.
+          </p>
+          <button class="primary-btn" type="button" id="assistedAckBtn">Got it</button>
+          <button class="primary-btn ghost" type="button" data-reset style="margin-top:10px;">Reset selection</button>
         </div>
 
         <div id="stepDone" class="hidden">
           <p class="done-message" style="padding:0;text-align:left;">
             <strong style="font-family:var(--font-display);font-size:18px;color:var(--ink);">Thank you.</strong><br>
-            Your response is saved. You can still use Download and Upload on the right when those are enabled.
+            Your response is saved. You can still use Download and Upload on the right.
           </p>
+          <button class="primary-btn ghost" type="button" data-reset style="margin-top:16px;">Reset selection</button>
         </div>
 
         <div id="status" role="status" aria-live="polite"></div>
@@ -530,15 +542,24 @@
   const statusEl = document.getElementById('status');
   const stepChoice = document.getElementById('stepChoice');
   const stepTimeframe = document.getElementById('stepTimeframe');
+  const stepAssisted = document.getElementById('stepAssisted');
   const stepDone = document.getElementById('stepDone');
+  const moreTimeRow = document.getElementById('moreTimeRow');
 
-  // All four choices open a secondary step; content per choice will be refined next.
-  const CHOICES_NEED_TIMEFRAME = new Set(['spreadsheet', 'upload_docs', 'specright', 'assisted']);
+  const CHOICES_NEED_TIMEFRAME = new Set(['spreadsheet', 'upload_docs', 'specright']);
 
   function setStatus(kind, message) {
     statusEl.className = kind || '';
     statusEl.textContent = message || '';
     if (!message) statusEl.className = '';
+  }
+
+  function showStep(which) {
+    stepChoice.classList.toggle('hidden', which !== 'choice');
+    stepTimeframe.classList.toggle('hidden', which !== 'timeframe');
+    stepAssisted.classList.toggle('hidden', which !== 'assisted');
+    stepDone.classList.toggle('hidden', which !== 'done');
+    if (which !== 'timeframe') moreTimeRow.classList.add('hidden');
   }
 
   function fmtNum(n) {
@@ -710,19 +731,32 @@
         downloadBtn.onclick = null;
       }
 
-      if (data.response && data.response.choice) {
-        if (data.response.timeframe || !CHOICES_NEED_TIMEFRAME.has(data.response.choice)) {
-          stepChoice.classList.add('hidden');
-          stepTimeframe.classList.add('hidden');
-          stepDone.classList.remove('hidden');
-        } else {
-          stepChoice.classList.add('hidden');
-          stepTimeframe.classList.remove('hidden');
-        }
-      }
+      applyResponseState(data.response);
     } catch (err) {
       setStatus('error', 'Could not load portal data. Check your connection.');
     }
+  }
+
+  function applyResponseState(response) {
+    stepChoice.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+    stepTimeframe.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+    if (!response || !response.choice) {
+      showStep('choice');
+      return;
+    }
+    if (response.timeframe) {
+      showStep('done');
+      return;
+    }
+    if (response.choice === 'assisted') {
+      showStep('assisted');
+      return;
+    }
+    if (CHOICES_NEED_TIMEFRAME.has(response.choice)) {
+      showStep('timeframe');
+      return;
+    }
+    showStep('done');
   }
 
   async function postRespond(payload) {
@@ -742,7 +776,7 @@
     const btn = event.target.closest('[data-choice]');
     if (!btn) return;
     const choice = btn.getAttribute('data-choice');
-    const label = btn.querySelector('strong')?.textContent?.replace(/\s*TBD\s*$/i, '').trim() || choice;
+    const label = btn.querySelector('strong')?.textContent?.trim() || choice;
     const buttons = stepChoice.querySelectorAll('button');
     buttons.forEach((b) => { b.disabled = true; });
     try {
@@ -755,13 +789,13 @@
         choice_label: label,
         submitted_at: new Date().toISOString(),
       });
-      setStatus('success', 'Choice saved.');
-      if (CHOICES_NEED_TIMEFRAME.has(choice)) {
-        stepChoice.classList.add('hidden');
-        stepTimeframe.classList.remove('hidden');
+      setStatus('');
+      if (choice === 'assisted') {
+        showStep('assisted');
+      } else if (CHOICES_NEED_TIMEFRAME.has(choice)) {
+        showStep('timeframe');
       } else {
-        stepChoice.classList.add('hidden');
-        stepDone.classList.remove('hidden');
+        showStep('done');
       }
     } catch (err) {
       setStatus('error', err.message || 'Could not save.');
@@ -783,8 +817,7 @@
         timeframe_submitted_at: new Date().toISOString(),
       });
       setStatus('');
-      stepTimeframe.classList.add('hidden');
-      stepDone.classList.remove('hidden');
+      showStep('done');
     } catch (err) {
       setStatus('error', err.message || 'Could not save.');
       buttons.forEach((b) => { b.disabled = false; });
@@ -792,6 +825,14 @@
   }
 
   stepTimeframe.addEventListener('click', (event) => {
+    if (event.target.closest('[data-reset]')) return;
+    const needMore = event.target.closest('#needMoreTimeBtn');
+    if (needMore) {
+      moreTimeRow.classList.remove('hidden');
+      document.getElementById('customDate').focus();
+      setStatus('', '');
+      return;
+    }
     const btn = event.target.closest('[data-timeframe]');
     if (!btn) return;
     submitTimeframe(btn.getAttribute('data-timeframe'), btn.getAttribute('data-label'));
@@ -800,10 +841,54 @@
   document.getElementById('customDateBtn').addEventListener('click', () => {
     const value = document.getElementById('customDate').value;
     if (!value) {
-      setStatus('error', 'Pick a date first.');
+      setStatus('error', 'Pick the date you expect to be done by.');
       return;
     }
-    submitTimeframe(value, value);
+    submitTimeframe(value, 'Done by ' + value);
+  });
+
+  document.getElementById('assistedAckBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('assistedAckBtn');
+    btn.disabled = true;
+    try {
+      await postRespond({
+        stage: 'timeframe',
+        vendor_id: vendorId,
+        vendor_name: vendorName || null,
+        token: token || null,
+        timeframe: 'reply_to_email',
+        timeframe_label: 'Will reply to email for 15-minute call',
+        timeframe_submitted_at: new Date().toISOString(),
+      });
+      setStatus('');
+      showStep('done');
+    } catch (err) {
+      setStatus('error', err.message || 'Could not save.');
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('portal').addEventListener('click', async (event) => {
+    const resetBtn = event.target.closest('[data-reset]');
+    if (!resetBtn) return;
+    resetBtn.disabled = true;
+    try {
+      await postRespond({
+        stage: 'reset',
+        vendor_id: vendorId,
+        vendor_name: vendorName || null,
+        token: token || null,
+      });
+      setStatus('success', 'Selection cleared. Choose again.');
+      showStep('choice');
+      stepChoice.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+      document.getElementById('assistedAckBtn').disabled = false;
+      document.getElementById('customDate').value = '';
+    } catch (err) {
+      setStatus('error', err.message || 'Could not reset.');
+    } finally {
+      resetBtn.disabled = false;
+    }
   });
 
   function updateUploadCount(count, max) {
