@@ -27,7 +27,7 @@
     min-height: 100vh;
     padding: 32px 16px 48px;
   }
-  .wrap { max-width: 640px; margin: 0 auto; display: grid; gap: 16px; }
+  .wrap { max-width: 920px; margin: 0 auto; display: grid; gap: 16px; }
   .card {
     background: rgba(255,255,255,0.8);
     border: 1px solid var(--line);
@@ -103,6 +103,47 @@
   }
   .list div:last-child { border-bottom: none; }
   .muted { color: var(--mute); }
+  .pill.complete { color: var(--ok); border-color: rgba(15,122,74,0.35); }
+  .pill.partial { color: #9a6700; border-color: rgba(154,103,0,0.35); }
+  .summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin: 12px 0 4px;
+    font-size: 13px;
+    color: var(--ink-soft, #2a3038);
+  }
+  .table-wrap {
+    margin-top: 14px;
+    max-height: 420px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  table.responses {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.responses th, table.responses td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  table.responses th {
+    position: sticky;
+    top: 0;
+    background: #f3f4f7;
+    font-family: var(--font-display);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--mute);
+  }
+  table.responses tr:last-child td { border-bottom: none; }
+  .btn-row { display: flex; gap: 10px; margin-top: 18px; }
+  .btn-row button { margin-top: 0; }
 </style>
 </head>
 <body>
@@ -116,7 +157,32 @@
     </div>
 
     <div class="card">
-      <h2>1 · Dashboard metrics ingest</h2>
+      <h2>1 · Vendor responses</h2>
+      <p>Who has responded on the portal, what they chose, and their timeframe / follow-up.</p>
+      <div class="btn-row">
+        <button type="button" class="secondary" id="loadResponses">Load responses</button>
+        <button type="button" class="secondary" id="downloadResponsesCsv">Download CSV</button>
+      </div>
+      <div id="responsesSummary" class="summary" hidden></div>
+      <div id="responsesStatus" class="status"></div>
+      <div class="table-wrap" id="responsesTableWrap" hidden>
+        <table class="responses">
+          <thead>
+            <tr>
+              <th>Vendor</th>
+              <th>Status</th>
+              <th>Choice</th>
+              <th>Timeframe / next step</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody id="responsesBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2 · Dashboard metrics ingest</h2>
       <p>Upload the Cleaners vendor dashboard one-pager (.xlsx). Upserts all ranked vendor rows.</p>
       <label for="metricsFile">Excel file</label>
       <input id="metricsFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
@@ -125,7 +191,7 @@
     </div>
 
     <div class="card">
-      <h2>2 · Vendor Excel template</h2>
+      <h2>3 · Vendor Excel template</h2>
       <p>Upload or replace the pre-built .xlsx for one vendor. Stored privately under that vendor only. Direct-to-Blob upload (not through the API body).</p>
       <button type="button" class="secondary" id="refreshVendors">Load vendor list</button>
       <label for="vendorSelect">Vendor</label>
@@ -140,7 +206,7 @@
     </div>
 
     <div class="card">
-      <h2>3 · Vendor PDF / DOCX uploads</h2>
+      <h2>4 · Vendor PDF / DOCX uploads</h2>
       <p>List and download files vendors uploaded. Paths are stable for future Spec Management System pull. Zip is built in your browser from private signed links.</p>
       <button type="button" class="secondary" id="refreshUploads">Load upload summary</button>
       <label for="uploadVendorSelect">Vendor</label>
@@ -176,6 +242,78 @@ function setStatus(id, kind, message) {
   el.className = 'status ' + (kind || '');
   el.textContent = message || '';
 }
+
+function formatWhen(value) {
+  if (!value) return '—';
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return String(value);
+  }
+}
+
+function statusPill(status) {
+  if (status === 'complete') return { text: 'Complete', cls: 'pill complete' };
+  if (status === 'choice_only') return { text: 'In progress', cls: 'pill partial' };
+  return { text: 'No response', cls: 'pill' };
+}
+
+async function loadResponses() {
+  const t = token();
+  if (!t) return setStatus('responsesStatus', 'err', 'Admin token required.');
+  setStatus('responsesStatus', '', 'Loading…');
+  const res = await fetch('/api/admin-responses?token=' + encodeURIComponent(t), {
+    headers: { 'x-admin-token': t },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load responses');
+
+  const summary = document.getElementById('responsesSummary');
+  summary.hidden = false;
+  summary.innerHTML =
+    `<span><strong>${data.summary.complete}</strong> complete</span>` +
+    `<span><strong>${data.summary.choice_only}</strong> in progress</span>` +
+    `<span><strong>${data.summary.no_response}</strong> no response</span>` +
+    `<span><strong>${data.summary.total_vendors}</strong> in metrics list</span>`;
+
+  const body = document.getElementById('responsesBody');
+  body.innerHTML = '';
+  data.responses.forEach((r) => {
+    const tr = document.createElement('tr');
+    const pill = statusPill(r.status);
+    tr.innerHTML =
+      `<td><strong></strong><div class="muted" style="font-size:11px;margin-top:2px;"></div></td>` +
+      `<td><span class="${pill.cls}"></span></td>` +
+      `<td></td><td></td><td class="muted"></td>`;
+    tr.cells[0].querySelector('strong').textContent = r.vendor_name || r.vendor_id;
+    tr.cells[0].querySelector('.muted').textContent =
+      (r.rank != null ? `#${r.rank} · ` : '') + r.vendor_id;
+    tr.cells[1].querySelector('span').textContent = pill.text;
+    tr.cells[2].textContent = r.choice_label || r.choice || '—';
+    tr.cells[3].textContent = r.timeframe_label || r.timeframe || '—';
+    tr.cells[4].textContent = formatWhen(r.last_updated_at || r.choice_submitted_at);
+    body.appendChild(tr);
+  });
+
+  document.getElementById('responsesTableWrap').hidden = false;
+  setStatus(
+    'responsesStatus',
+    'ok',
+    `Loaded ${data.responses.length} row(s).`
+  );
+}
+
+document.getElementById('loadResponses').addEventListener('click', async () => {
+  try { await loadResponses(); }
+  catch (err) { setStatus('responsesStatus', 'err', err.message || String(err)); }
+});
+
+document.getElementById('downloadResponsesCsv').addEventListener('click', () => {
+  const t = token();
+  if (!t) return setStatus('responsesStatus', 'err', 'Admin token required.');
+  window.location.href = '/api/admin-responses?format=csv&token=' + encodeURIComponent(t);
+});
 
 document.getElementById('ingestBtn').addEventListener('click', async () => {
   const t = token();
