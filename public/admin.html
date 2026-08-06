@@ -138,10 +138,25 @@
       <div id="excelStatus" class="status"></div>
       <div id="vendorList" class="list" hidden></div>
     </div>
+
+    <div class="card">
+      <h2>3 · Vendor PDF / DOCX uploads</h2>
+      <p>List and download files vendors uploaded. Paths are stable for future Spec Management System pull. Zip is built in your browser from private signed links.</p>
+      <button type="button" class="secondary" id="refreshUploads">Load upload summary</button>
+      <label for="uploadVendorSelect">Vendor</label>
+      <select id="uploadVendorSelect" disabled>
+        <option value="">Load summary first…</option>
+      </select>
+      <button type="button" class="secondary" id="loadVendorFiles">Show this vendor’s files</button>
+      <button type="button" id="zipVendorFiles">Download all as ZIP</button>
+      <div id="uploadsStatus" class="status"></div>
+      <div id="uploadsList" class="list" hidden></div>
+    </div>
   </div>
 
 <script type="module">
 import { upload } from 'https://esm.sh/@vercel/blob@2.7.0/client';
+import JSZip from 'https://esm.sh/jszip@3.10.1';
 
 const tokenEl = document.getElementById('token');
 const saved = sessionStorage.getItem('ro_admin_token');
@@ -289,6 +304,142 @@ document.getElementById('uploadExcelBtn').addEventListener('click', async () => 
     document.getElementById('vendorSelect').value = vendorId;
   } catch (err) {
     setStatus('excelStatus', 'err', err.message || String(err));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+let currentUploadFiles = [];
+
+async function loadUploadSummary() {
+  const t = token();
+  if (!t) {
+    setStatus('uploadsStatus', 'err', 'Admin token required.');
+    return;
+  }
+  setStatus('uploadsStatus', '', 'Loading…');
+  const res = await fetch('/api/admin-uploads?token=' + encodeURIComponent(t), {
+    headers: { 'x-admin-token': t },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load uploads');
+
+  const select = document.getElementById('uploadVendorSelect');
+  select.innerHTML = '';
+  select.disabled = false;
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = `Select vendor (${data.vendors.length})…`;
+  select.appendChild(placeholder);
+
+  data.vendors.forEach((v) => {
+    const opt = document.createElement('option');
+    opt.value = v.vendor_id;
+    opt.textContent = `${v.rank || '—'} · ${v.vendor_name} · ${v.upload_count} file(s)`;
+    select.appendChild(opt);
+  });
+
+  setStatus('uploadsStatus', 'ok', `Loaded ${data.vendors.length} vendors.`);
+}
+
+async function loadVendorFiles() {
+  const t = token();
+  const vendorId = document.getElementById('uploadVendorSelect').value;
+  if (!t) return setStatus('uploadsStatus', 'err', 'Admin token required.');
+  if (!vendorId) return setStatus('uploadsStatus', 'err', 'Select a vendor.');
+
+  setStatus('uploadsStatus', '', 'Loading files…');
+  const res = await fetch(
+    '/api/admin-uploads?token=' + encodeURIComponent(t) + '&vendor_id=' + encodeURIComponent(vendorId),
+    { headers: { 'x-admin-token': t }, cache: 'no-store' }
+  );
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load files');
+
+  currentUploadFiles = data.files || [];
+  const list = document.getElementById('uploadsList');
+  list.hidden = false;
+  list.innerHTML = '';
+
+  if (!currentUploadFiles.length) {
+    list.innerHTML = '<div><span class="muted">No uploads for this vendor.</span></div>';
+  } else {
+    currentUploadFiles.forEach((f) => {
+      const row = document.createElement('div');
+      const left = document.createElement('span');
+      left.textContent = f.original_name;
+      left.title = f.pathname;
+      const link = document.createElement('a');
+      link.textContent = 'Download';
+      link.href =
+        '/api/admin-upload-file?token=' +
+        encodeURIComponent(t) +
+        '&id=' +
+        encodeURIComponent(f.id);
+      link.style.color = 'inherit';
+      link.style.fontWeight = '600';
+      row.appendChild(left);
+      row.appendChild(link);
+      list.appendChild(row);
+    });
+  }
+
+  setStatus('uploadsStatus', 'ok', `${currentUploadFiles.length} file(s) for ${vendorId}.`);
+}
+
+document.getElementById('refreshUploads').addEventListener('click', async () => {
+  try { await loadUploadSummary(); }
+  catch (err) { setStatus('uploadsStatus', 'err', err.message || String(err)); }
+});
+
+document.getElementById('loadVendorFiles').addEventListener('click', async () => {
+  try { await loadVendorFiles(); }
+  catch (err) { setStatus('uploadsStatus', 'err', err.message || String(err)); }
+});
+
+document.getElementById('zipVendorFiles').addEventListener('click', async () => {
+  const t = token();
+  const vendorId = document.getElementById('uploadVendorSelect').value;
+  const btn = document.getElementById('zipVendorFiles');
+  if (!t) return setStatus('uploadsStatus', 'err', 'Admin token required.');
+  if (!vendorId) return setStatus('uploadsStatus', 'err', 'Select a vendor.');
+
+  btn.disabled = true;
+  try {
+    if (!currentUploadFiles.length || currentUploadFiles[0]?.vendor_id !== vendorId) {
+      await loadVendorFiles();
+    }
+    if (!currentUploadFiles.length) {
+      setStatus('uploadsStatus', 'err', 'No files to zip.');
+      return;
+    }
+
+    setStatus('uploadsStatus', '', `Zipping ${currentUploadFiles.length} file(s)…`);
+    const zip = new JSZip();
+    let i = 0;
+    for (const f of currentUploadFiles) {
+      i += 1;
+      setStatus('uploadsStatus', '', `Fetching ${i}/${currentUploadFiles.length}: ${f.original_name}`);
+      const res = await fetch(
+        '/api/admin-upload-file?token=' + encodeURIComponent(t) + '&id=' + encodeURIComponent(f.id)
+      );
+      if (!res.ok) throw new Error(`Failed to fetch ${f.original_name}`);
+      const buf = await res.arrayBuffer();
+      const name = f.original_name || f.pathname.split('/').pop();
+      zip.file(`${String(i).padStart(3, '0')}-${name}`, buf);
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${vendorId}-uploads.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus('uploadsStatus', 'ok', `Downloaded ZIP with ${currentUploadFiles.length} file(s).`);
+  } catch (err) {
+    setStatus('uploadsStatus', 'err', err.message || String(err));
   } finally {
     btn.disabled = false;
   }

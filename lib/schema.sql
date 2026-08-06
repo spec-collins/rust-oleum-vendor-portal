@@ -58,12 +58,15 @@ CREATE TABLE IF NOT EXISTS vendor_uploads (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   vendor_id     TEXT NOT NULL,
   pathname      TEXT NOT NULL,
+  blob_url      TEXT,
   original_name TEXT NOT NULL,
   content_type  TEXT,
   byte_size     BIGINT,
   uploaded_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (vendor_id, pathname)
 );
+
+ALTER TABLE vendor_uploads ADD COLUMN IF NOT EXISTS blob_url TEXT;
 
 CREATE INDEX IF NOT EXISTS vendor_uploads_vendor_idx
   ON vendor_uploads (vendor_id, uploaded_at DESC);

@@ -340,6 +340,41 @@
     font-size: 12px;
     color: var(--mute);
   }
+  .upload-zone {
+    margin-top: 4px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 12px;
+    padding: 14px;
+    background: rgba(255,255,255,0.45);
+    text-align: center;
+  }
+  .upload-zone input[type="file"] {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    font-size: 12px;
+  }
+  .upload-progress {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align: left;
+  }
+  .upload-progress .row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .upload-progress .row:last-child { border-bottom: none; }
+  .upload-progress .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .upload-progress .ok { color: var(--ok); font-weight: 600; }
+  .upload-progress .err { color: var(--danger); }
 
   #status {
     margin-top: 16px;
@@ -469,8 +504,14 @@
           <div class="action-card">
             <h3>Upload PDF / DOCX</h3>
             <p>Up to <span id="maxFilesLabel">500</span> files · PDF and DOCX only · max <span id="maxSizeLabel">25 MB</span> each.</p>
-            <button class="primary-btn ghost" type="button" id="uploadBtn" disabled>Upload coming soon</button>
-            <p class="hint" id="uploadHint">Phase 4 — direct-to-storage bulk upload.</p>
+            <p class="hint" id="uploadCountHint" style="margin:0 0 10px;">0 files on file for you.</p>
+            <div class="upload-zone">
+              <div style="font-size:13px;color:var(--ink-soft);">Select many files at once. Uploads go directly to secure storage.</div>
+              <input id="uploadInput" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
+              <button class="primary-btn" type="button" id="uploadBtn" style="margin-top:12px;">Upload selected</button>
+            </div>
+            <div class="upload-progress" id="uploadProgress" hidden></div>
+            <p class="hint" id="uploadHint">Files stay under your vendor ID only.</p>
           </div>
         </div>
       </section>
@@ -651,6 +692,7 @@
       document.getElementById('maxFilesLabel').textContent = String(data.upload.max_files);
       document.getElementById('maxSizeLabel').textContent =
         Math.round(data.upload.max_bytes_per_file / (1024 * 1024)) + ' MB';
+      updateUploadCount(data.upload.count, data.upload.max_files);
 
       const downloadBtn = document.getElementById('downloadBtn');
       if (data.download_ready) {
@@ -761,6 +803,145 @@
       return;
     }
     submitTimeframe(value, value);
+  });
+
+  function updateUploadCount(count, max) {
+    const el = document.getElementById('uploadCountHint');
+    el.textContent = `${count || 0} file${count === 1 ? '' : 's'} on file for you` +
+      (max ? ` · ${Math.max(0, max - (count || 0))} remaining` : '') + '.';
+  }
+
+  function extOf(name) {
+    const m = /\.([a-z0-9]+)$/i.exec(name || '');
+    return m ? '.' + m[1].toLowerCase() : '';
+  }
+
+  function safeBase(name) {
+    return String(name || 'document')
+      .replace(/^.*[\\/]/, '')
+      .replace(/\.[^.]+$/, '')
+      .replace(/[^\w.\- ()[\]]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'document';
+  }
+
+  function buildPath(vendorId, file) {
+    const ext = extOf(file.name);
+    const id = crypto.randomUUID();
+    return `uploads/${vendorId}/${id}-${safeBase(file.name)}${ext}`;
+  }
+
+  async function refreshUploadCount() {
+    try {
+      const qs = new URLSearchParams({ vid: vendorId, t: token });
+      const res = await fetch('/api/uploads?' + qs.toString(), { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok && data.ok) updateUploadCount(data.count, data.max_files);
+    } catch (_) { /* ignore */ }
+  }
+
+  document.getElementById('uploadBtn').addEventListener('click', async () => {
+    const input = document.getElementById('uploadInput');
+    const files = Array.from(input.files || []);
+    const btn = document.getElementById('uploadBtn');
+    const progress = document.getElementById('uploadProgress');
+
+    if (!vendorId) return;
+    if (!files.length) {
+      document.getElementById('uploadHint').textContent = 'Choose one or more PDF/DOCX files first.';
+      return;
+    }
+
+    const maxBytes = 25 * 1024 * 1024;
+    const allowed = new Set(['.pdf', '.docx']);
+    btn.disabled = true;
+    progress.hidden = false;
+    progress.innerHTML = '';
+
+    const { upload } = await import('https://esm.sh/@vercel/blob@2.7.0/client');
+    let okCount = 0;
+    let failCount = 0;
+
+    // Sequential queue keeps token/count checks sane for large batches.
+    for (const file of files) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = '<div class="name"></div><div class="state">Waiting…</div>';
+      row.querySelector('.name').textContent = file.name;
+      const state = row.querySelector('.state');
+      progress.appendChild(row);
+
+      const ext = extOf(file.name);
+      if (!allowed.has(ext)) {
+        state.textContent = 'Skipped (type)';
+        state.className = 'state err';
+        failCount += 1;
+        continue;
+      }
+      if (file.size > maxBytes) {
+        state.textContent = 'Skipped (too large)';
+        state.className = 'state err';
+        failCount += 1;
+        continue;
+      }
+
+      try {
+        state.textContent = 'Uploading…';
+        const pathname = buildPath(vendorId, file);
+        const blob = await upload(pathname, file, {
+          access: 'private',
+          handleUploadUrl: '/api/upload',
+          multipart: file.size > 4 * 1024 * 1024,
+          clientPayload: JSON.stringify({
+            vendor_id: vendorId,
+            token,
+            filename: file.name,
+            size: file.size,
+            content_type: file.type || null,
+          }),
+          headers: { 'x-vendor-token': token },
+          contentType: file.type || undefined,
+          onUploadProgress: ({ percentage }) => {
+            state.textContent = Math.round(percentage) + '%';
+          },
+        });
+
+        const complete = await fetch('/api/upload-complete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-vendor-token': token,
+          },
+          body: JSON.stringify({
+            vendor_id: vendorId,
+            token,
+            pathname: blob.pathname,
+            url: blob.url,
+            filename: file.name,
+            content_type: file.type || null,
+            size: file.size,
+          }),
+        });
+        const data = await complete.json();
+        if (!complete.ok || !data.ok) throw new Error(data.error || 'Register failed');
+
+        state.textContent = 'Saved';
+        state.className = 'state ok';
+        okCount += 1;
+        if (data.count != null) updateUploadCount(data.count, data.max_files || 500);
+      } catch (err) {
+        state.textContent = err.message || 'Failed';
+        state.className = 'state err';
+        failCount += 1;
+      }
+    }
+
+    document.getElementById('uploadHint').textContent =
+      `Done: ${okCount} uploaded` + (failCount ? `, ${failCount} failed/skipped` : '') + '.';
+    input.value = '';
+    btn.disabled = false;
+    await refreshUploadCount();
   });
 
   bootstrap();

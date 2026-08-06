@@ -77,7 +77,7 @@ export default async function handler(req, res) {
       download_ready: false,
       upload: uploadMeta,
       response: null,
-      phases: { metrics: true, download: true, upload: false },
+      phases: { metrics: true, download: true, upload: true },
       db: false,
     });
   }
@@ -131,7 +131,7 @@ export default async function handler(req, res) {
     phases: {
       metrics: true,
       download: true,
-      upload: false,
+      upload: true,
     },
   });
 }
