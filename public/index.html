@@ -443,7 +443,7 @@
 
       <section class="panel" aria-labelledby="response-heading">
         <h2 id="response-heading">How will you provide data?</h2>
-        <p class="lede">Choose one path. You’ll confirm a few details on the next screen.</p>
+        <p class="lede" id="responseLede">Choose one path. You’ll confirm a few details on the next screen.</p>
 
         <div id="stepChoice">
           <button class="option-btn" type="button" data-choice="spreadsheet">
@@ -560,6 +560,8 @@
     stepAssisted.classList.toggle('hidden', which !== 'assisted');
     stepDone.classList.toggle('hidden', which !== 'done');
     if (which !== 'timeframe') moreTimeRow.classList.add('hidden');
+    const lede = document.getElementById('responseLede');
+    if (lede) lede.classList.toggle('hidden', which !== 'choice');
   }
 
   function fmtNum(n) {
