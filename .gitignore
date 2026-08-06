@@ -1,0 +1,8 @@
+node_modules/
+.vercel/
+.env
+.env.*
+!.env.example
+*.log
+GO_LIVE_SECRETS.local.md
+*_SECRETS.local.md

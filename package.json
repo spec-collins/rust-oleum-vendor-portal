@@ -1,0 +1,19 @@
+{
+  "name": "rust-oleum-vendor-portal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Rust-Oleum vendor portal: metrics, signed response flow, Excel download, bulk PDF/DOCX upload",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs",
+    "migrate": "node scripts/migrate.mjs",
+    "links": "node scripts/make-links.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}
