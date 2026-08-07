@@ -80,10 +80,10 @@
 
   .grid {
     display: grid;
-    /* How it works (1) and Files (4) share the same track size */
+    /* How it works (1) and Your Files (4) share the same track size */
     grid-template-columns: minmax(220px, 1fr) minmax(200px, 0.9fr) minmax(280px, 1.35fr) minmax(220px, 1fr);
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
   }
 
   .panel {
@@ -101,16 +101,26 @@
   .panel:nth-child(4) { animation-delay: 0.15s; }
 
   .panel.video-panel {
+    display: flex;
+    flex-direction: column;
     padding: 18px 14px 14px;
+    min-height: 100%;
   }
   .panel.video-panel .lede {
     margin: 0 0 10px;
     font-size: 13px;
+    flex: 0 0 auto;
+  }
+  .panel.video-panel h2 {
+    flex: 0 0 auto;
   }
 
   .video-frame {
     position: relative;
     width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Grow with the Files column height; keep at least a tall 9:16 feel */
     aspect-ratio: 9 / 16;
     border-radius: 12px;
     overflow: hidden;
@@ -118,6 +128,10 @@
     background:
       linear-gradient(165deg, rgba(26, 108, 255, 0.08), transparent 45%),
       linear-gradient(180deg, #e8ebf0 0%, #dfe3ea 100%);
+  }
+  .panel.video-panel .video-frame {
+    aspect-ratio: auto;
+    height: 100%;
   }
   .video-frame video {
     display: block;
@@ -521,7 +535,7 @@
 
     <div id="portal" class="grid hidden">
       <section class="panel video-panel" aria-labelledby="video-heading">
-        <h2 id="video-heading">How it works</h2>
+        <h2 id="video-heading">1. How it works</h2>
         <p class="lede">A short walkthrough of this portal.</p>
         <div class="video-frame" id="videoFrame">
           <div class="video-placeholder" id="videoPlaceholder">
@@ -534,13 +548,13 @@
       </section>
 
       <section class="panel" aria-labelledby="metrics-heading">
-        <h2 id="metrics-heading">Your dashboard</h2>
+        <h2 id="metrics-heading">2. Your dashboard</h2>
         <p class="lede">Estimated Cleaners specs for your account. Spec counts drive VOR scope and cost.</p>
         <div class="metrics" id="metrics"></div>
       </section>
 
       <section class="panel" aria-labelledby="response-heading">
-        <h2 id="response-heading">How will you provide data?</h2>
+        <h2 id="response-heading">3. How will you provide data?</h2>
         <p class="lede" id="responseLede">Choose one path. You’ll confirm a few details on the next screen.</p>
 
         <div id="stepChoice">
@@ -602,7 +616,7 @@
       </section>
 
       <section class="panel" aria-labelledby="files-heading">
-        <h2 id="files-heading">Files</h2>
+        <h2 id="files-heading">4. Your files</h2>
         <p class="lede">Vendor-specific download and bulk document upload.</p>
         <div class="action-stack">
           <div class="action-card">
