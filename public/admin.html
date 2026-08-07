@@ -70,6 +70,21 @@
     color: var(--ink);
     border: 1px solid var(--line);
   }
+  button.danger {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid rgba(180, 35, 24, 0.35);
+  }
+  button.danger:hover:not(:disabled) {
+    background: rgba(180, 35, 24, 0.06);
+  }
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .btn-row button { margin-top: 0; }
   button:disabled { opacity: 0.45; cursor: not-allowed; }
   .status { margin-top: 14px; font-size: 13px; white-space: pre-wrap; }
   .status.ok { color: var(--ok); font-weight: 600; }
@@ -209,7 +224,7 @@
 
     <div class="card">
       <h2>3 · Vendor Excel template</h2>
-      <p>Upload or replace the pre-built .xlsx for one vendor. Stored privately under that vendor only. Direct-to-Blob upload (not through the API body).</p>
+      <p>Upload or replace the pre-built .xlsx for one vendor. Stored privately under that vendor only. Direct-to-Blob upload (not through the API body). Upload / replace overwrites in place; use Delete when you want the vendor portal to show “unavailable” until a new file is uploaded.</p>
       <button type="button" class="secondary" id="refreshVendors">Load vendor list</button>
       <label for="vendorSelect">Vendor</label>
       <select id="vendorSelect" disabled>
@@ -218,6 +233,10 @@
       <label for="excelFile">Vendor Excel (.xlsx)</label>
       <input id="excelFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
       <button type="button" id="uploadExcelBtn">Upload / replace template</button>
+      <div class="btn-row">
+        <button type="button" class="danger" id="deleteExcelBtn">Delete this vendor’s Excel</button>
+        <button type="button" class="danger" id="deleteAllExcelBtn">Delete all vendor Excels</button>
+      </div>
       <div id="excelStatus" class="status"></div>
       <div id="vendorList" class="list" hidden></div>
     </div>
@@ -522,6 +541,68 @@ document.getElementById('uploadExcelBtn').addEventListener('click', async () => 
     setStatus('excelStatus', 'ok', `Saved template for ${vendorId} (${file.name}).`);
     await loadVendors();
     document.getElementById('vendorSelect').value = vendorId;
+  } catch (err) {
+    setStatus('excelStatus', 'err', err.message || String(err));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('deleteExcelBtn').addEventListener('click', async () => {
+  const t = token();
+  const vendorId = document.getElementById('vendorSelect').value;
+  const btn = document.getElementById('deleteExcelBtn');
+  if (!t) return setStatus('excelStatus', 'err', 'Admin token required.');
+  if (!vendorId) return setStatus('excelStatus', 'err', 'Select a vendor.');
+  if (!confirm(`Delete the Excel template for ${vendorId}? The vendor portal will show download unavailable until you upload again.`)) {
+    return;
+  }
+
+  btn.disabled = true;
+  setStatus('excelStatus', '', `Deleting Excel for ${vendorId}…`);
+  try {
+    const res = await fetch(
+      '/api/admin-downloads?vendor_id=' + encodeURIComponent(vendorId) + '&token=' + encodeURIComponent(t),
+      { method: 'DELETE', headers: { 'x-admin-token': t }, cache: 'no-store' }
+    );
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Delete failed');
+    if (!data.deleted) {
+      setStatus('excelStatus', 'ok', `No Excel on file for ${vendorId}.`);
+    } else {
+      setStatus('excelStatus', 'ok', `Deleted Excel for ${vendorId}.`);
+    }
+    await loadVendors();
+    document.getElementById('vendorSelect').value = vendorId;
+  } catch (err) {
+    setStatus('excelStatus', 'err', err.message || String(err));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('deleteAllExcelBtn').addEventListener('click', async () => {
+  const t = token();
+  const btn = document.getElementById('deleteAllExcelBtn');
+  if (!t) return setStatus('excelStatus', 'err', 'Admin token required.');
+  if (!confirm('Delete ALL vendor Excel templates from Blob and the registry? This cannot be undone from the admin UI.')) {
+    return;
+  }
+  if (!confirm('Confirm again: wipe every vendor Excel now?')) {
+    return;
+  }
+
+  btn.disabled = true;
+  setStatus('excelStatus', '', 'Deleting all vendor Excels…');
+  try {
+    const res = await fetch(
+      '/api/admin-downloads?all=1&token=' + encodeURIComponent(t),
+      { method: 'DELETE', headers: { 'x-admin-token': t }, cache: 'no-store' }
+    );
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Delete all failed');
+    setStatus('excelStatus', 'ok', `Deleted ${data.deleted} vendor Excel(s).`);
+    await loadVendors();
   } catch (err) {
     setStatus('excelStatus', 'err', err.message || String(err));
   } finally {
