@@ -80,8 +80,8 @@
 
   .grid {
     display: grid;
-    /* How it works (1) and Your Files (4) share the same track size */
-    grid-template-columns: minmax(220px, 1fr) minmax(200px, 0.9fr) minmax(280px, 1.35fr) minmax(220px, 1fr);
+    /* Col 1 width is set in JS so the video frame lands on true 9:16 */
+    grid-template-columns: var(--how-col, minmax(240px, 1fr)) minmax(200px, 0.9fr) minmax(280px, 1.35fr) minmax(220px, 1fr);
     gap: 16px;
     align-items: stretch;
   }
@@ -118,20 +118,16 @@
   .video-frame {
     position: relative;
     width: 100%;
-    flex: 1 1 auto;
-    min-height: 0;
-    /* Grow with the Files column height; keep at least a tall 9:16 feel */
+    flex: 0 0 auto;
     aspect-ratio: 9 / 16;
+    margin-top: auto;
+    margin-bottom: auto;
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--line);
     background:
       linear-gradient(165deg, rgba(26, 108, 255, 0.08), transparent 45%),
       linear-gradient(180deg, #e8ebf0 0%, #dfe3ea 100%);
-  }
-  .panel.video-panel .video-frame {
-    aspect-ratio: auto;
-    height: 100%;
   }
   .video-frame video {
     display: block;
@@ -674,6 +670,59 @@
     if (which !== 'timeframe') moreTimeRow.classList.add('hidden');
     const lede = document.getElementById('responseLede');
     if (lede) lede.classList.toggle('hidden', which !== 'choice');
+    scheduleHowColumnSync();
+  }
+
+  /** Widen column 1 so the video frame is exactly 9:16 at the shared row height. */
+  function syncHowColumn() {
+    const grid = document.getElementById('portal');
+    const panel = document.querySelector('.video-panel');
+    if (!grid || !panel || grid.classList.contains('hidden')) return;
+
+    if (window.matchMedia('(max-width: 900px)').matches) {
+      grid.style.removeProperty('--how-col');
+      return;
+    }
+
+    grid.style.removeProperty('--how-col');
+
+    const files = document.querySelector('[aria-labelledby="files-heading"]');
+    const response = document.querySelector('[aria-labelledby="response-heading"]');
+    const metrics = document.querySelector('[aria-labelledby="metrics-heading"]');
+    const targetH = Math.max(
+      files?.offsetHeight || 0,
+      response?.offsetHeight || 0,
+      metrics?.offsetHeight || 0
+    );
+    if (targetH < 200) return;
+
+    const cs = getComputedStyle(panel);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const h2 = panel.querySelector('h2');
+    const lede = panel.querySelector('.lede');
+    const h2Mb = h2 ? parseFloat(getComputedStyle(h2).marginBottom) || 0 : 0;
+    const ledeMb = lede ? parseFloat(getComputedStyle(lede).marginBottom) || 0 : 0;
+    const h2H = h2 ? h2.offsetHeight + h2Mb : 0;
+    const ledeH = lede ? lede.offsetHeight + ledeMb : 0;
+
+    const frameH = Math.max(160, targetH - padY - h2H - ledeH);
+    const frameW = frameH * (9 / 16);
+    const maxCol = Math.min(440, Math.floor(grid.clientWidth * 0.34));
+    const colW = Math.round(Math.min(maxCol, Math.max(220, frameW + padX)));
+    grid.style.setProperty('--how-col', `${colW}px`);
+  }
+
+  let howColSyncTimer = null;
+  function scheduleHowColumnSync() {
+    clearTimeout(howColSyncTimer);
+    howColSyncTimer = setTimeout(() => {
+      requestAnimationFrame(() => {
+        syncHowColumn();
+        // Second pass after width change can nudge sibling heights slightly.
+        requestAnimationFrame(syncHowColumn);
+      });
+    }, 40);
   }
 
   function fmtNum(n) {
@@ -847,6 +896,7 @@
 
       wireExplainerVideo(Boolean(data.explainer_video_ready));
       applyResponseState(data.response);
+      scheduleHowColumnSync();
     } catch (err) {
       setStatus('error', 'Could not load portal data. Check your connection.');
     }
@@ -1167,6 +1217,17 @@
     btn.disabled = false;
     await refreshUploadCount();
   });
+
+  window.addEventListener('resize', scheduleHowColumnSync);
+  if (typeof ResizeObserver !== 'undefined') {
+    const portalEl = document.getElementById('portal');
+    const ro = new ResizeObserver(() => scheduleHowColumnSync());
+    if (portalEl) ro.observe(portalEl);
+    const filesPanel = document.querySelector('[aria-labelledby="files-heading"]');
+    const responsePanel = document.querySelector('[aria-labelledby="response-heading"]');
+    if (filesPanel) ro.observe(filesPanel);
+    if (responsePanel) ro.observe(responsePanel);
+  }
 
   bootstrap();
 })();
