@@ -480,6 +480,34 @@
   #status.error { color: var(--danger); display: block; }
   #status.loading { color: var(--ink-soft); display: block; }
 
+  .deadline-notice {
+    margin-top: 18px;
+    padding: 14px 14px 13px;
+    border-radius: 12px;
+    border: 1px solid rgba(154, 103, 0, 0.28);
+    background: linear-gradient(160deg, rgba(154, 103, 0, 0.08), rgba(255,255,255,0.55));
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink-soft);
+  }
+  .deadline-notice strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .deadline-notice.locked {
+    border-color: rgba(58, 95, 138, 0.28);
+    background: linear-gradient(160deg, rgba(58, 95, 138, 0.08), rgba(255,255,255,0.55));
+  }
+  .deadline-notice.help {
+    border-color: rgba(26, 108, 255, 0.22);
+    background: linear-gradient(160deg, rgba(26, 108, 255, 0.08), rgba(255,255,255,0.55));
+  }
+
   .gate, .done-message {
     grid-column: 1 / -1;
     text-align: center;
@@ -609,6 +637,10 @@
         </div>
 
         <div id="status" role="status" aria-live="polite"></div>
+        <div class="deadline-notice" id="deadlineNotice" role="status" aria-live="polite">
+          <strong>Response needed within 48 hours</strong>
+          Please lock in your answer for section 3 within 48 hours of receiving your SpecInsite email and vendor-specific link.
+        </div>
       </section>
 
       <section class="panel" aria-labelledby="files-heading">
@@ -655,6 +687,7 @@
   const moreTimeRow = document.getElementById('moreTimeRow');
 
   const CHOICES_NEED_TIMEFRAME = new Set(['spreadsheet', 'upload_docs', 'specright']);
+  let lockedResponse = null;
 
   function setStatus(kind, message) {
     statusEl.className = kind || '';
@@ -925,9 +958,101 @@
     frame.classList.add('has-video');
   }
 
+  function toDateOnly(value) {
+    if (!value) return null;
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+  }
+
+  function addDays(isoOrDate, days) {
+    const base = toDateOnly(isoOrDate);
+    if (!base) return null;
+    const d = new Date(`${base}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function formatNiceDate(isoDate) {
+    if (!isoDate) return '';
+    const d = new Date(`${isoDate}T12:00:00Z`);
+    return d.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+  }
+
+  function daysBetween(fromIso, toIso) {
+    const a = toDateOnly(fromIso);
+    const b = toDateOnly(toIso);
+    if (!a || !b) return null;
+    const da = new Date(`${a}T12:00:00Z`);
+    const db = new Date(`${b}T12:00:00Z`);
+    return Math.round((db - da) / 86400000);
+  }
+
+  function computeVendorDueDate(response) {
+    if (!response?.timeframe) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(response.timeframe)) return response.timeframe;
+    const anchor =
+      response.timeframe_submitted_at ||
+      response.choice_submitted_at ||
+      new Date().toISOString();
+    if (response.timeframe === 'this_week') return addDays(anchor, 7);
+    if (response.timeframe === 'next_two_weeks') return addDays(anchor, 14);
+    return null;
+  }
+
+  function updateDeadlineNotice(response) {
+    const el = document.getElementById('deadlineNotice');
+    if (!el) return;
+
+    if (!response || !response.timeframe) {
+      el.className = 'deadline-notice';
+      el.innerHTML =
+        '<strong>Response needed within 48 hours</strong>' +
+        'Please lock in your answer for section 3 within 48 hours of receiving your SpecInsite email and vendor-specific link.';
+      return;
+    }
+
+    if (response.timeframe === 'reply_to_email' || response.choice === 'assisted') {
+      el.className = 'deadline-notice help';
+      el.innerHTML =
+        '<strong>Next step: schedule 15 minutes</strong>' +
+        'Please reply to your SpecInsite email so we can set up a 15-minute call and help you provide your data.';
+      return;
+    }
+
+    const due = computeVendorDueDate(response);
+    const anchor =
+      response.timeframe_submitted_at ||
+      response.choice_submitted_at ||
+      new Date().toISOString();
+    const farOut = due && daysBetween(anchor, due) > 21;
+
+    if (farOut) {
+      el.className = 'deadline-notice help';
+      el.innerHTML =
+        `<strong>Target date: ${escapeHtml(formatNiceDate(due))}</strong>` +
+        'Because that date is more than 21 days out, please reply to your SpecInsite email and set up a 15-minute call so SpecInsite can help you provide your data.';
+      return;
+    }
+
+    el.className = 'deadline-notice locked';
+    el.innerHTML =
+      `<strong>Your due date: ${escapeHtml(formatNiceDate(due))}</strong>` +
+      'Thanks for locking in a path. Please plan to have your data ready by this date.';
+  }
+
   function applyResponseState(response) {
+    lockedResponse = response || null;
     stepChoice.querySelectorAll('button').forEach((b) => { b.disabled = false; });
     stepTimeframe.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+    updateDeadlineNotice(response);
     if (!response || !response.choice) {
       showStep('choice');
       return;
@@ -978,6 +1103,16 @@
         submitted_at: new Date().toISOString(),
       });
       setStatus('');
+      lockedResponse = {
+        ...(lockedResponse || {}),
+        choice,
+        choice_label: label,
+        choice_submitted_at: new Date().toISOString(),
+        timeframe: null,
+        timeframe_label: null,
+        timeframe_submitted_at: null,
+      };
+      updateDeadlineNotice(lockedResponse);
       if (choice === 'assisted') {
         showStep('assisted');
       } else if (CHOICES_NEED_TIMEFRAME.has(choice)) {
@@ -994,6 +1129,7 @@
   async function submitTimeframe(timeframe, label) {
     const buttons = stepTimeframe.querySelectorAll('button');
     buttons.forEach((b) => { b.disabled = true; });
+    const submittedAt = new Date().toISOString();
     try {
       await postRespond({
         stage: 'timeframe',
@@ -1002,9 +1138,16 @@
         token: token || null,
         timeframe,
         timeframe_label: label,
-        timeframe_submitted_at: new Date().toISOString(),
+        timeframe_submitted_at: submittedAt,
       });
       setStatus('');
+      lockedResponse = {
+        ...(lockedResponse || {}),
+        timeframe,
+        timeframe_label: label,
+        timeframe_submitted_at: submittedAt,
+      };
+      updateDeadlineNotice(lockedResponse);
       showStep('done');
     } catch (err) {
       setStatus('error', err.message || 'Could not save.');
@@ -1038,6 +1181,7 @@
   document.getElementById('assistedAckBtn').addEventListener('click', async () => {
     const btn = document.getElementById('assistedAckBtn');
     btn.disabled = true;
+    const submittedAt = new Date().toISOString();
     try {
       await postRespond({
         stage: 'timeframe',
@@ -1046,9 +1190,17 @@
         token: token || null,
         timeframe: 'reply_to_email',
         timeframe_label: 'Will reply to email for 15-minute call',
-        timeframe_submitted_at: new Date().toISOString(),
+        timeframe_submitted_at: submittedAt,
       });
       setStatus('');
+      lockedResponse = {
+        ...(lockedResponse || {}),
+        choice: 'assisted',
+        timeframe: 'reply_to_email',
+        timeframe_label: 'Will reply to email for 15-minute call',
+        timeframe_submitted_at: submittedAt,
+      };
+      updateDeadlineNotice(lockedResponse);
       showStep('done');
     } catch (err) {
       setStatus('error', err.message || 'Could not save.');
@@ -1068,6 +1220,8 @@
         token: token || null,
       });
       setStatus('success', 'Selection cleared. Choose again.');
+      lockedResponse = null;
+      updateDeadlineNotice(null);
       showStep('choice');
       stepChoice.querySelectorAll('button').forEach((b) => { b.disabled = false; });
       document.getElementById('assistedAckBtn').disabled = false;

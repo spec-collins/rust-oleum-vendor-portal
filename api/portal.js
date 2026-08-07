@@ -110,7 +110,8 @@ export default async function handler(req, res) {
     uploadCount = ups.rows[0]?.n || 0;
 
     const resp = await query(
-      `SELECT choice, choice_label, timeframe, timeframe_label
+      `SELECT choice, choice_label, choice_submitted_at,
+              timeframe, timeframe_label, timeframe_submitted_at
          FROM vendor_responses WHERE vendor_id = $1`,
       [vendorId]
     );
