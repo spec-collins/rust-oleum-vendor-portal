@@ -919,6 +919,7 @@
         document.getElementById('downloadHint').textContent = 'Downloads only your vendor’s file.';
         downloadBtn.onclick = () => {
           const qs = new URLSearchParams({ vid: vendorId, t: token });
+          if (vendorName) qs.set('name', vendorName);
           window.location.href = '/api/download?' + qs.toString();
         };
       } else {

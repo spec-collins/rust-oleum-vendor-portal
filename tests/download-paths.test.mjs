@@ -4,6 +4,8 @@ import {
   downloadPathname,
   isValidVendorId,
   vendorIdFromDownloadPath,
+  vendorTemplateFilename,
+  humanizeVendorId,
 } from '../lib/download-paths.js';
 
 test('download path is scoped to vendor slug', () => {
@@ -22,4 +24,20 @@ test('download path is scoped to vendor slug', () => {
     'other'
   );
   assert.equal(vendorIdFromDownloadPath('uploads/mpi-label-systems/a.pdf'), null);
+});
+
+test('download filename uses vendor name + template', () => {
+  assert.equal(
+    vendorTemplateFilename('MPI Label System', 'mpi-label-systems'),
+    'MPI Label System template.xlsx'
+  );
+  assert.equal(
+    vendorTemplateFilename('Packaging Corporation of America', 'pca'),
+    'Packaging Corporation of America template.xlsx'
+  );
+  assert.equal(
+    vendorTemplateFilename(null, 'mpi-label-systems'),
+    'Mpi Label Systems template.xlsx'
+  );
+  assert.equal(humanizeVendorId('mpi-label-systems'), 'Mpi Label Systems');
 });

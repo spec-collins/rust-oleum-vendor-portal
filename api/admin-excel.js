@@ -5,7 +5,7 @@ import {
   downloadPathname,
   isValidVendorId,
   vendorIdFromDownloadPath,
-  safeExcelFilename,
+  vendorTemplateFilename,
 } from '../lib/download-paths.js';
 import { registerVendorDownload } from '../lib/register-download.js';
 
@@ -63,6 +63,8 @@ async function handleTokenFlow(req, res, body) {
           throw new Error(`pathname must be ${expected}`);
         }
 
+        const vendorName = String(payload.vendor_name || '').trim() || null;
+
         return {
           allowedContentTypes: XLSX_TYPES,
           maximumSizeInBytes: 40 * 1024 * 1024,
@@ -70,7 +72,8 @@ async function handleTokenFlow(req, res, body) {
           addRandomSuffix: false,
           tokenPayload: JSON.stringify({
             vendor_id: vendorId,
-            filename: safeExcelFilename(payload.filename, vendorId),
+            vendor_name: vendorName,
+            filename: vendorTemplateFilename(vendorName, vendorId),
           }),
         };
       },
@@ -89,9 +92,10 @@ async function handleTokenFlow(req, res, body) {
         }
         await registerVendorDownload({
           vendorId,
+          vendorName: meta.vendor_name || null,
           blobUrl: blob.url,
           pathname: blob.pathname,
-          filename: meta.filename || blob.pathname.split('/').pop(),
+          filename: meta.filename || null,
           byteSize: blob.size ?? null,
         });
       },
@@ -109,9 +113,9 @@ async function handleComplete(req, res, value) {
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, error: auth.error });
 
   const vendorId = String(value.vendor_id || '').trim();
+  const vendorName = String(value.vendor_name || '').trim() || null;
   const pathname = String(value.pathname || '').trim();
   const blobUrl = String(value.url || value.blob_url || '').trim();
-  const filename = value.filename ? String(value.filename) : null;
   const byteSize =
     value.size != null || value.byte_size != null
       ? Number(value.size ?? value.byte_size)
@@ -133,9 +137,9 @@ async function handleComplete(req, res, value) {
   try {
     const row = await registerVendorDownload({
       vendorId,
+      vendorName,
       blobUrl,
       pathname,
-      filename,
       byteSize: Number.isFinite(byteSize) ? byteSize : null,
     });
     return sendJson(res, 200, { ok: true, download: row });

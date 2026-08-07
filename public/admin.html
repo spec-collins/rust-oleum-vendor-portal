@@ -540,6 +540,7 @@ async function loadVendors() {
   data.vendors.forEach((v) => {
     const opt = document.createElement('option');
     opt.value = v.vendor_id;
+    opt.dataset.name = v.vendor_name || '';
     opt.textContent = `${v.rank || '—'} · ${v.vendor_name}${v.has_download ? ' · ready' : ''}`;
     select.appendChild(opt);
 
@@ -578,12 +579,18 @@ document.getElementById('uploadExcelBtn').addEventListener('click', async () => 
   btn.disabled = true;
   setStatus('excelStatus', '', 'Uploading to private storage…');
   try {
+    const vendorName =
+      document.getElementById('vendorSelect').selectedOptions[0]?.dataset?.name || '';
     const pathname = `downloads/${vendorId}/template.xlsx`;
     const blob = await upload(pathname, file, {
       access: 'private',
       handleUploadUrl: '/api/admin-excel',
       multipart: file.size > 4 * 1024 * 1024,
-      clientPayload: JSON.stringify({ vendor_id: vendorId, filename: file.name }),
+      clientPayload: JSON.stringify({
+        vendor_id: vendorId,
+        vendor_name: vendorName,
+        filename: file.name,
+      }),
       headers: { 'x-admin-token': t },
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
@@ -596,9 +603,9 @@ document.getElementById('uploadExcelBtn').addEventListener('click', async () => 
       },
       body: JSON.stringify({
         vendor_id: vendorId,
+        vendor_name: vendorName,
         pathname: blob.pathname,
         url: blob.url,
-        filename: file.name,
         size: file.size,
       }),
     });
