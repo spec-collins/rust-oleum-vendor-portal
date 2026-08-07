@@ -153,6 +153,13 @@ Follow-up logic: `lib/follow-up.js`. Assistance uses `admin_status` on `vendor_r
 
 Work queue when David returns (in this order unless he says otherwise):
 
+### Explainer video (shared)
+
+- Leftmost portal column: 9∶16 “How it works” panel.
+- One global MP4 in private Blob (`assets/explainer.mp4`), registry `portal_media`.
+- Admin section 5: upload / replace / delete (`api/admin-video.js`).
+- Vendor playback via signed redirect `api/video.js?vid=&t=`.
+
 ### (2) Real Excel templates
 
 - Produce/upload **real** per-vendor `.xlsx` workbooks for pilots (and then all vendors).

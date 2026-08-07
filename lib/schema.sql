@@ -73,3 +73,14 @@ ALTER TABLE vendor_uploads ADD COLUMN IF NOT EXISTS blob_url TEXT;
 
 CREATE INDEX IF NOT EXISTS vendor_uploads_vendor_idx
   ON vendor_uploads (vendor_id, uploaded_at DESC);
+
+-- Global portal media (shared across vendors), e.g. explainer video.
+CREATE TABLE IF NOT EXISTS portal_media (
+  asset_key     TEXT PRIMARY KEY,
+  pathname      TEXT NOT NULL,
+  filename      TEXT NOT NULL,
+  content_type  TEXT,
+  blob_url      TEXT,
+  byte_size     BIGINT,
+  uploaded_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);

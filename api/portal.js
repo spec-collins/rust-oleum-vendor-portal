@@ -6,6 +6,7 @@ import {
   MAX_UPLOAD_FILES_PER_VENDOR,
   ALLOWED_UPLOAD_EXTENSIONS,
 } from '../lib/limits.js';
+import { getExplainerVideo } from '../lib/explainer-video.js';
 
 function clean(value, max) {
   if (typeof value !== 'string') return '';
@@ -59,6 +60,7 @@ export default async function handler(req, res) {
   let downloadReady = false;
   let uploadCount = 0;
   let response = null;
+  let explainerReady = false;
 
   const uploadMeta = {
     count: 0,
@@ -75,9 +77,10 @@ export default async function handler(req, res) {
       has_metrics: false,
       dashboard,
       download_ready: false,
+      explainer_video_ready: false,
       upload: uploadMeta,
       response: null,
-      phases: { metrics: true, download: true, upload: true },
+      phases: { metrics: true, download: true, upload: true, explainer: true },
       db: false,
     });
   }
@@ -112,6 +115,13 @@ export default async function handler(req, res) {
       [vendorId]
     );
     if (resp.rows[0]) response = resp.rows[0];
+
+    try {
+      const explainer = await getExplainerVideo();
+      explainerReady = Boolean(explainer?.pathname);
+    } catch (mediaErr) {
+      if (mediaErr && mediaErr.code !== UNDEFINED_TABLE) throw mediaErr;
+    }
   } catch (err) {
     if (err && err.code !== UNDEFINED_TABLE) {
       console.error('portal lookup failed:', err);
@@ -126,12 +136,14 @@ export default async function handler(req, res) {
     has_metrics: hasMetrics,
     dashboard,
     download_ready: downloadReady,
+    explainer_video_ready: explainerReady,
     upload: { ...uploadMeta, count: uploadCount },
     response,
     phases: {
       metrics: true,
       download: true,
       upload: true,
+      explainer: true,
     },
   });
 }

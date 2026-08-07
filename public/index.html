@@ -42,7 +42,7 @@
   }
 
   .shell {
-    width: min(1180px, calc(100% - 32px));
+    width: min(1360px, calc(100% - 32px));
     margin: 0 auto;
     padding: 28px 0 48px;
   }
@@ -80,7 +80,7 @@
 
   .grid {
     display: grid;
-    grid-template-columns: minmax(200px, 0.9fr) minmax(280px, 1.35fr) minmax(220px, 1fr);
+    grid-template-columns: minmax(180px, 0.72fr) minmax(200px, 0.9fr) minmax(280px, 1.35fr) minmax(220px, 1fr);
     gap: 16px;
     align-items: start;
   }
@@ -95,8 +95,56 @@
     box-shadow: 0 1px 0 rgba(255,255,255,0.65) inset, 0 18px 40px rgba(11, 13, 16, 0.04);
     animation: rise 0.65s ease both;
   }
-  .panel:nth-child(2) { animation-delay: 0.06s; }
-  .panel:nth-child(3) { animation-delay: 0.12s; }
+  .panel:nth-child(2) { animation-delay: 0.05s; }
+  .panel:nth-child(3) { animation-delay: 0.1s; }
+  .panel:nth-child(4) { animation-delay: 0.15s; }
+
+  .video-frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 9 / 16;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background:
+      linear-gradient(165deg, rgba(26, 108, 255, 0.08), transparent 45%),
+      linear-gradient(180deg, #e8ebf0 0%, #dfe3ea 100%);
+  }
+  .video-frame video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #0b0d10;
+  }
+  .video-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 20px;
+    text-align: center;
+    color: var(--mute);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .video-placeholder strong {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    letter-spacing: 0.02em;
+  }
+  .video-placeholder .ratio-tag {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--mute);
+  }
+  .video-frame.has-video .video-placeholder { display: none; }
 
   .panel h2 {
     margin: 0 0 4px;
@@ -463,6 +511,19 @@
     </div>
 
     <div id="portal" class="grid hidden">
+      <section class="panel" aria-labelledby="video-heading">
+        <h2 id="video-heading">How it works</h2>
+        <p class="lede">A short walkthrough of this portal.</p>
+        <div class="video-frame" id="videoFrame">
+          <div class="video-placeholder" id="videoPlaceholder">
+            <strong>Explainer video</strong>
+            <span>Coming soon</span>
+            <span class="ratio-tag">9∶16</span>
+          </div>
+          <video id="explainerVideo" controls playsinline preload="metadata" hidden></video>
+        </div>
+      </section>
+
       <section class="panel" aria-labelledby="metrics-heading">
         <h2 id="metrics-heading">Your dashboard</h2>
         <p class="lede">Estimated Cleaners specs for your account. Spec counts drive VOR scope and cost.</p>
@@ -761,10 +822,34 @@
         downloadBtn.onclick = null;
       }
 
+      wireExplainerVideo(Boolean(data.explainer_video_ready));
       applyResponseState(data.response);
     } catch (err) {
       setStatus('error', 'Could not load portal data. Check your connection.');
     }
+  }
+
+  function wireExplainerVideo(ready) {
+    const frame = document.getElementById('videoFrame');
+    const video = document.getElementById('explainerVideo');
+    const placeholder = document.getElementById('videoPlaceholder');
+    if (!frame || !video) return;
+
+    if (!ready) {
+      frame.classList.remove('has-video');
+      video.hidden = true;
+      video.removeAttribute('src');
+      video.load();
+      if (placeholder) {
+        placeholder.querySelector('span') && (placeholder.querySelector('span').textContent = 'Coming soon');
+      }
+      return;
+    }
+
+    const qs = new URLSearchParams({ vid: vendorId, t: token });
+    video.src = '/api/video?' + qs.toString();
+    video.hidden = false;
+    frame.classList.add('has-video');
   }
 
   function applyResponseState(response) {

@@ -254,6 +254,17 @@
       <div id="uploadsStatus" class="status"></div>
       <div id="uploadsList" class="list" hidden></div>
     </div>
+
+    <div class="card">
+      <h2>5 · Explainer video</h2>
+      <p>One shared 9∶16 (mobile) MP4 shown in the leftmost portal column for every vendor. Upload / replace overwrites in place. Delete clears it so vendors see the placeholder again.</p>
+      <button type="button" class="secondary" id="refreshVideo">Check video status</button>
+      <label for="videoFile">Explainer video (.mp4)</label>
+      <input id="videoFile" type="file" accept="video/mp4,.mp4">
+      <button type="button" id="uploadVideoBtn">Upload / replace video</button>
+      <button type="button" class="danger" id="deleteVideoBtn">Delete explainer video</button>
+      <div id="videoStatus" class="status"></div>
+    </div>
   </div>
 
 <script type="module">
@@ -741,6 +752,123 @@ document.getElementById('zipVendorFiles').addEventListener('click', async () => 
     setStatus('uploadsStatus', 'ok', `Downloaded ZIP with ${currentUploadFiles.length} file(s).`);
   } catch (err) {
     setStatus('uploadsStatus', 'err', err.message || String(err));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function formatBytes(n) {
+  if (n == null || !Number.isFinite(n)) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function loadVideoStatus() {
+  const t = token();
+  if (!t) {
+    setStatus('videoStatus', 'err', 'Admin token required.');
+    return;
+  }
+  setStatus('videoStatus', '', 'Checking…');
+  const res = await fetch('/api/admin-video?token=' + encodeURIComponent(t), {
+    headers: { 'x-admin-token': t },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load video status');
+  if (!data.ready) {
+    setStatus('videoStatus', 'ok', 'No explainer video on file. Portal shows the 9∶16 placeholder.');
+    return;
+  }
+  const v = data.video;
+  setStatus(
+    'videoStatus',
+    'ok',
+    `On file: ${v.filename} · ${formatBytes(v.byte_size)} · uploaded ${v.uploaded_at || '—'}`
+  );
+}
+
+document.getElementById('refreshVideo').addEventListener('click', async () => {
+  try { await loadVideoStatus(); }
+  catch (err) { setStatus('videoStatus', 'err', err.message || String(err)); }
+});
+
+document.getElementById('uploadVideoBtn').addEventListener('click', async () => {
+  const t = token();
+  const file = document.getElementById('videoFile').files[0];
+  const btn = document.getElementById('uploadVideoBtn');
+  if (!t) return setStatus('videoStatus', 'err', 'Admin token required.');
+  if (!file) return setStatus('videoStatus', 'err', 'Choose an .mp4 file.');
+  if (!/\.mp4$/i.test(file.name) && file.type !== 'video/mp4') {
+    return setStatus('videoStatus', 'err', 'File must be .mp4');
+  }
+  if (file.size > 200 * 1024 * 1024) {
+    return setStatus('videoStatus', 'err', 'Max size is 200 MB.');
+  }
+
+  btn.disabled = true;
+  setStatus('videoStatus', '', 'Uploading video to private storage…');
+  try {
+    const pathname = 'assets/explainer.mp4';
+    const blob = await upload(pathname, file, {
+      access: 'private',
+      handleUploadUrl: '/api/admin-video',
+      multipart: file.size > 4 * 1024 * 1024,
+      clientPayload: JSON.stringify({ filename: file.name }),
+      headers: { 'x-admin-token': t },
+      contentType: 'video/mp4',
+    });
+
+    const complete = await fetch('/api/admin-video?token=' + encodeURIComponent(t), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-token': t,
+      },
+      body: JSON.stringify({
+        pathname: blob.pathname,
+        url: blob.url,
+        filename: file.name,
+        size: file.size,
+      }),
+    });
+    const data = await complete.json();
+    if (!complete.ok || !data.ok) throw new Error(data.error || 'Register failed');
+    setStatus('videoStatus', 'ok', `Saved explainer video (${file.name}).`);
+    await loadVideoStatus();
+  } catch (err) {
+    setStatus('videoStatus', 'err', err.message || String(err));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('deleteVideoBtn').addEventListener('click', async () => {
+  const t = token();
+  const btn = document.getElementById('deleteVideoBtn');
+  if (!t) return setStatus('videoStatus', 'err', 'Admin token required.');
+  if (!confirm('Delete the shared explainer video? Every vendor will see the placeholder until you upload again.')) {
+    return;
+  }
+
+  btn.disabled = true;
+  setStatus('videoStatus', '', 'Deleting explainer video…');
+  try {
+    const res = await fetch('/api/admin-video?token=' + encodeURIComponent(t), {
+      method: 'DELETE',
+      headers: { 'x-admin-token': t },
+      cache: 'no-store',
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Delete failed');
+    if (!data.deleted) {
+      setStatus('videoStatus', 'ok', 'No explainer video was on file.');
+    } else {
+      setStatus('videoStatus', 'ok', 'Deleted explainer video.');
+    }
+  } catch (err) {
+    setStatus('videoStatus', 'err', err.message || String(err));
   } finally {
     btn.disabled = false;
   }
