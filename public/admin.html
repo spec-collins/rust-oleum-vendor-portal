@@ -11,38 +11,80 @@
 <style>
   :root {
     --ink: #0b0d10;
+    --ink-soft: #2a3038;
     --mute: #6b7280;
     --line: rgba(11,13,16,0.12);
     --ok: #0f7a4a;
     --danger: #b42318;
     --font-display: "Space Grotesk", sans-serif;
     --font-body: "DM Sans", sans-serif;
+    --radius: 14px;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     font-family: var(--font-body);
     color: var(--ink);
-    background: linear-gradient(180deg, #eef1f6, #f7f8fa);
+    background:
+      radial-gradient(1200px 600px at 12% -10%, rgba(26, 108, 255, 0.10), transparent 55%),
+      radial-gradient(900px 500px at 88% 0%, rgba(11, 13, 16, 0.06), transparent 50%),
+      linear-gradient(180deg, #eef1f6 0%, #f7f8fa 45%, #f3f4f7 100%);
     min-height: 100vh;
-    padding: 32px 16px 48px;
+    -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 920px; margin: 0 auto; display: grid; gap: 16px; }
+  .wrap {
+    width: min(1720px, calc(100% - 24px));
+    margin: 0 auto;
+    padding: 28px 0 48px;
+    display: grid;
+    gap: 16px;
+  }
+  .row {
+    display: grid;
+    gap: 16px;
+    align-items: stretch;
+  }
+  .row-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .row-2 {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  }
   .card {
-    background: rgba(255,255,255,0.8);
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 28px;
+    border-radius: var(--radius);
+    padding: 22px 20px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.65) inset, 0 18px 40px rgba(11, 13, 16, 0.04);
+    min-width: 0;
   }
+  .card-token .token-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: end;
+    margin-top: 4px;
+  }
+  .card-token .token-row label { margin-top: 0; }
+  .card-token .token-row button { margin-top: 0; width: auto; padding: 12px 18px; white-space: nowrap; }
   h1, h2 {
     margin: 0 0 6px;
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
   h1 { font-size: 22px; }
-  h2 { font-size: 17px; margin-top: 0; }
-  p { color: var(--mute); font-size: 14px; line-height: 1.45; }
-  label { display: block; font-size: 12px; color: var(--mute); margin: 16px 0 6px; }
+  h2 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-top: 0;
+  }
+  p { color: var(--mute); font-size: 14px; line-height: 1.45; margin: 0 0 4px; }
+  label { display: block; font-size: 12px; color: var(--mute); margin: 14px 0 6px; }
   input[type="password"], input[type="file"], select {
     width: 100%;
     font: inherit;
@@ -53,7 +95,7 @@
   }
   input[type="file"] { padding: 10px; }
   button {
-    margin-top: 18px;
+    margin-top: 14px;
     width: 100%;
     border: none;
     border-radius: 10px;
@@ -82,7 +124,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-    margin-top: 18px;
+    margin-top: 14px;
   }
   .btn-row button { margin-top: 0; }
   button:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -142,11 +184,11 @@
     gap: 10px 16px;
     margin: 12px 0 4px;
     font-size: 13px;
-    color: var(--ink-soft, #2a3038);
+    color: var(--ink-soft);
   }
   .table-wrap {
     margin-top: 14px;
-    max-height: 420px;
+    max-height: 480px;
     overflow: auto;
     border: 1px solid var(--line);
     border-radius: 10px;
@@ -155,6 +197,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
+    min-width: 640px;
   }
   table.responses th, table.responses td {
     text-align: left;
@@ -173,97 +216,110 @@
     color: var(--mute);
   }
   table.responses tr:last-child td { border-bottom: none; }
-  .btn-row { display: flex; gap: 10px; margin-top: 18px; }
-  .btn-row button { margin-top: 0; }
+
+  @media (max-width: 1100px) {
+    .row-3 { grid-template-columns: 1fr; }
+    .row-2 { grid-template-columns: 1fr; }
+    .card-token .token-row { grid-template-columns: 1fr; }
+    .card-token .token-row button { width: 100%; }
+  }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="card">
+    <div class="card card-token">
       <h1>SpecInsite admin</h1>
       <p>Rust-Oleum Cleaners vendor portal ops. Token stays in this browser only.</p>
-      <label for="token">Admin token</label>
-      <input id="token" type="password" autocomplete="off" placeholder="ADMIN_TOKEN">
-      <button type="button" class="secondary" id="saveToken">Save token in this browser</button>
-    </div>
-
-    <div class="card">
-      <h2>1 · Vendor responses</h2>
-      <p>Who has responded on the portal, what they chose, and their timeframe / follow-up.</p>
-      <div class="btn-row">
-        <button type="button" class="secondary" id="loadResponses">Load responses</button>
-        <button type="button" class="secondary" id="downloadResponsesCsv">Download CSV</button>
-      </div>
-      <div id="responsesSummary" class="summary" hidden></div>
-      <div id="responsesStatus" class="status"></div>
-      <div class="table-wrap" id="responsesTableWrap" hidden>
-        <table class="responses">
-          <thead>
-            <tr>
-              <th>Vendor</th>
-              <th>Status</th>
-              <th>Follow-up date</th>
-              <th>Choice</th>
-              <th>Vendor said</th>
-              <th>Updated</th>
-            </tr>
-          </thead>
-          <tbody id="responsesBody"></tbody>
-        </table>
+      <div class="token-row">
+        <div>
+          <label for="token">Admin token</label>
+          <input id="token" type="password" autocomplete="off" placeholder="ADMIN_TOKEN">
+        </div>
+        <button type="button" class="secondary" id="saveToken">Save token in this browser</button>
       </div>
     </div>
 
-    <div class="card">
-      <h2>2 · Dashboard metrics ingest</h2>
-      <p>Upload the Cleaners vendor dashboard one-pager (.xlsx). Upserts all ranked vendor rows.</p>
-      <label for="metricsFile">Excel file</label>
-      <input id="metricsFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-      <button type="button" id="ingestBtn">Ingest workbook</button>
-      <div id="ingestStatus" class="status"></div>
-    </div>
-
-    <div class="card">
-      <h2>3 · Vendor Excel template</h2>
-      <p>Upload or replace the pre-built .xlsx for one vendor. Stored privately under that vendor only. Direct-to-Blob upload (not through the API body). Upload / replace overwrites in place; use Delete when you want the vendor portal to show “unavailable” until a new file is uploaded.</p>
-      <button type="button" class="secondary" id="refreshVendors">Load vendor list</button>
-      <label for="vendorSelect">Vendor</label>
-      <select id="vendorSelect" disabled>
-        <option value="">Load vendors first…</option>
-      </select>
-      <label for="excelFile">Vendor Excel (.xlsx)</label>
-      <input id="excelFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-      <button type="button" id="uploadExcelBtn">Upload / replace template</button>
-      <div class="btn-row">
-        <button type="button" class="danger" id="deleteExcelBtn">Delete this vendor’s Excel</button>
-        <button type="button" class="danger" id="deleteAllExcelBtn">Delete all vendor Excels</button>
+    <div class="row row-3">
+      <div class="card">
+        <h2>1 · Explainer video</h2>
+        <p>Shared 9∶16 MP4 for the portal’s How it works column. Upload / replace overwrites; delete shows the placeholder again.</p>
+        <button type="button" class="secondary" id="refreshVideo">Check video status</button>
+        <label for="videoFile">Explainer video (.mp4)</label>
+        <input id="videoFile" type="file" accept="video/mp4,.mp4">
+        <button type="button" id="uploadVideoBtn">Upload / replace video</button>
+        <button type="button" class="danger" id="deleteVideoBtn">Delete explainer video</button>
+        <div id="videoStatus" class="status"></div>
       </div>
-      <div id="excelStatus" class="status"></div>
-      <div id="vendorList" class="list" hidden></div>
+
+      <div class="card">
+        <h2>2 · Dashboard metrics</h2>
+        <p>Upload the Cleaners vendor dashboard one-pager (.xlsx). Upserts all ranked vendor rows.</p>
+        <label for="metricsFile">Excel file</label>
+        <input id="metricsFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        <button type="button" id="ingestBtn">Ingest workbook</button>
+        <div id="ingestStatus" class="status"></div>
+      </div>
+
+      <div class="card">
+        <h2>3 · Vendor Excel template</h2>
+        <p>Pre-built .xlsx per vendor. Upload / replace overwrites; delete clears so the portal shows unavailable.</p>
+        <button type="button" class="secondary" id="refreshVendors">Load vendor list</button>
+        <label for="vendorSelect">Vendor</label>
+        <select id="vendorSelect" disabled>
+          <option value="">Load vendors first…</option>
+        </select>
+        <label for="excelFile">Vendor Excel (.xlsx)</label>
+        <input id="excelFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        <button type="button" id="uploadExcelBtn">Upload / replace template</button>
+        <div class="btn-row">
+          <button type="button" class="danger" id="deleteExcelBtn">Delete this vendor’s Excel</button>
+          <button type="button" class="danger" id="deleteAllExcelBtn">Delete all vendor Excels</button>
+        </div>
+        <div id="excelStatus" class="status"></div>
+        <div id="vendorList" class="list" hidden></div>
+      </div>
     </div>
 
-    <div class="card">
-      <h2>4 · Vendor PDF / DOCX uploads</h2>
-      <p>List and download files vendors uploaded. Paths are stable for future Spec Management System pull. Zip is built in your browser from private signed links.</p>
-      <button type="button" class="secondary" id="refreshUploads">Load upload summary</button>
-      <label for="uploadVendorSelect">Vendor</label>
-      <select id="uploadVendorSelect" disabled>
-        <option value="">Load summary first…</option>
-      </select>
-      <button type="button" class="secondary" id="loadVendorFiles">Show this vendor’s files</button>
-      <button type="button" id="zipVendorFiles">Download all as ZIP</button>
-      <div id="uploadsStatus" class="status"></div>
-      <div id="uploadsList" class="list" hidden></div>
-    </div>
+    <div class="row row-2">
+      <div class="card">
+        <h2>4 · Vendor responses</h2>
+        <p>Who has responded, what they chose, and their timeframe / follow-up.</p>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="loadResponses">Load responses</button>
+          <button type="button" class="secondary" id="downloadResponsesCsv">Download CSV</button>
+        </div>
+        <div id="responsesSummary" class="summary" hidden></div>
+        <div id="responsesStatus" class="status"></div>
+        <div class="table-wrap" id="responsesTableWrap" hidden>
+          <table class="responses">
+            <thead>
+              <tr>
+                <th>Vendor</th>
+                <th>Status</th>
+                <th>Follow-up date</th>
+                <th>Choice</th>
+                <th>Vendor said</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody id="responsesBody"></tbody>
+          </table>
+        </div>
+      </div>
 
-    <div class="card">
-      <h2>5 · Explainer video</h2>
-      <p>One shared 9∶16 (mobile) MP4 shown in the leftmost portal column for every vendor. Upload / replace overwrites in place. Delete clears it so vendors see the placeholder again.</p>
-      <button type="button" class="secondary" id="refreshVideo">Check video status</button>
-      <label for="videoFile">Explainer video (.mp4)</label>
-      <input id="videoFile" type="file" accept="video/mp4,.mp4">
-      <button type="button" id="uploadVideoBtn">Upload / replace video</button>
-      <button type="button" class="danger" id="deleteVideoBtn">Delete explainer video</button>
-      <div id="videoStatus" class="status"></div>
+      <div class="card">
+        <h2>5 · Vendor PDF / DOCX uploads</h2>
+        <p>List and download vendor uploads. Paths stay stable for Spec Management System pull. Zip builds in the browser.</p>
+        <button type="button" class="secondary" id="refreshUploads">Load upload summary</button>
+        <label for="uploadVendorSelect">Vendor</label>
+        <select id="uploadVendorSelect" disabled>
+          <option value="">Load summary first…</option>
+        </select>
+        <button type="button" class="secondary" id="loadVendorFiles">Show this vendor’s files</button>
+        <button type="button" id="zipVendorFiles">Download all as ZIP</button>
+        <div id="uploadsStatus" class="status"></div>
+        <div id="uploadsList" class="list" hidden></div>
+      </div>
     </div>
   </div>
 
