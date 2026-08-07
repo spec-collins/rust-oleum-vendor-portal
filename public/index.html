@@ -639,7 +639,7 @@
         <div id="status" role="status" aria-live="polite"></div>
         <div class="deadline-notice" id="deadlineNotice" role="status" aria-live="polite">
           <strong>Response needed within 48 hours</strong>
-          Please lock in your answer for section 3 within 48 hours of receiving your SpecInsite email and vendor-specific link.
+          Selection Required: Please tell us how you plan to provide data within 48 hours of accessing this Vendor Portal.
         </div>
       </section>
 
@@ -1015,7 +1015,7 @@
       el.className = 'deadline-notice';
       el.innerHTML =
         '<strong>Response needed within 48 hours</strong>' +
-        'Please lock in your answer for section 3 within 48 hours of receiving your SpecInsite email and vendor-specific link.';
+        'Selection Required: Please tell us how you plan to provide data within 48 hours of accessing this Vendor Portal.';
       return;
     }
 
@@ -1038,7 +1038,7 @@
       el.className = 'deadline-notice help';
       el.innerHTML =
         `<strong>Target date: ${escapeHtml(formatNiceDate(due))}</strong>` +
-        'Because that date is more than 21 days out, please reply to your SpecInsite email and set up a 15-minute call so SpecInsite can help you provide your data.';
+        'Because that date is more than 21 days out, please reply to your SpecInsite email and set up a 15-minute call with SpecInsite. They can help you provide your data.';
       return;
     }
 
