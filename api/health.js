@@ -17,7 +17,9 @@ export default async function handler(req, res) {
     database_url_set: Boolean(url),
     database_pooled: url ? url.includes('-pooler') : null,
     admin_token_set: Boolean(process.env.ADMIN_TOKEN),
+    sms_pull_token_set: Boolean(process.env.SMS_PULL_TOKEN || process.env.ADMIN_TOKEN),
     link_signing_enabled: Boolean(process.env.LINK_SIGNING_SECRET),
+    base_url_set: Boolean(process.env.BASE_URL),
     max_upload_files: MAX_UPLOAD_FILES_PER_VENDOR,
     max_upload_bytes_per_file: MAX_UPLOAD_BYTES_PER_FILE,
   };
