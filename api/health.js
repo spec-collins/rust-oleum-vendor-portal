@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
   const url = resolveConnectionString();
   const config = {
-    project: 'rust-oleum-vendor-portal',
+    project: process.env.PORTAL_PROJECT || 'rust-oleum-vendor-portal',
     database_url_set: Boolean(url),
     database_pooled: url ? url.includes('-pooler') : null,
     admin_token_set: Boolean(process.env.ADMIN_TOKEN),
